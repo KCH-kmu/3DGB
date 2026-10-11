@@ -131,7 +131,7 @@ TextureImporter:
         serializedVersion: 2
         x: 0
         y: 0
-        width: 132.66667
+        width: 133
         height: 132
       alignment: 0
       pivot: {x: 0, y: 0}
@@ -150,9 +150,9 @@ TextureImporter:
       name: blank_button_1
       rect:
         serializedVersion: 2
-        x: 132
+        x: 133
         y: 0
-        width: 132.66667
+        width: 132
         height: 132
       alignment: 0
       pivot: {x: 0, y: 0}
@@ -171,9 +171,9 @@ TextureImporter:
       name: blank_button_2
       rect:
         serializedVersion: 2
-        x: 264
+        x: 265
         y: 0
-        width: 132.66667
+        width: 133
         height: 132
       alignment: 0
       pivot: {x: 0, y: 0}

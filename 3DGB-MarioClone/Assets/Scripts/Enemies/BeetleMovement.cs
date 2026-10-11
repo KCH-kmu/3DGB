@@ -73,20 +73,33 @@ public class BeetleMovement : MonoBehaviour
         }
     }
 
-    public void TryFreezeFromHead(PlayerMovement player)
+    public void TryFreezeFromHead(
+        PlayerMovement player,
+        Collider2D playerCollider,
+        Collider2D headZoneCollider
+    )
     {
         Rigidbody2D playerBody = player.GetComponent<Rigidbody2D>();
 
-        if (isFrozen || playerBody == null)
+        if (
+            isFrozen ||
+            playerBody == null ||
+            playerCollider == null ||
+            headZoneCollider == null
+        )
         {
             return;
         }
 
-        bool playerIsAbove =
-            player.transform.position.y > transform.position.y;
-        bool playerIsFalling = playerBody.velocity.y <= 0f;
+        // 걷는 중의 Y 속도 0을 낙하로 판단하지 않는다.
+        bool playerIsFalling = playerBody.velocity.y < -0.1f;
 
-        if (!playerIsAbove || !playerIsFalling)
+        // 플레이어의 실제 발이 머리 판정 영역 위에 있을 때만 밟기로 처리한다.
+        bool playerFeetAreAboveHead =
+            playerCollider.bounds.min.y >=
+            headZoneCollider.bounds.center.y;
+
+        if (!playerIsFalling || !playerFeetAreAboveHead)
         {
             return;
         }

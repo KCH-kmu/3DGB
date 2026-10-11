@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using UnityEngine;
 
 public class PlayerMovement : MonoBehaviour
@@ -10,6 +11,8 @@ public class PlayerMovement : MonoBehaviour
     private SpriteRenderer spriteRenderer;
 
     private bool isGrounded;
+    private readonly HashSet<Collider2D> groundContacts =
+        new HashSet<Collider2D>();
 
     private void Awake()
     {
@@ -57,8 +60,8 @@ public class PlayerMovement : MonoBehaviour
             myBody.velocity =
                 new Vector2(myBody.velocity.x, jumpForce);
 
-            isGrounded = false;
-            anim.SetBool("Jump", true);
+            groundContacts.Clear();
+            SetGrounded(false);
         }
     }
 
@@ -72,8 +75,8 @@ public class PlayerMovement : MonoBehaviour
         if (collision.gameObject.layer ==
             LayerMask.NameToLayer("Ground"))
         {
-            isGrounded = true;
-            anim.SetBool("Jump", false);
+            groundContacts.Add(collision);
+            SetGrounded(true);
         }
     }
 
@@ -82,10 +85,17 @@ public class PlayerMovement : MonoBehaviour
         if (collision.gameObject.layer ==
             LayerMask.NameToLayer("Ground"))
         {
-            isGrounded = false;
-            anim.SetBool("Jump", true);
+            groundContacts.Remove(collision);
+            SetGrounded(groundContacts.Count > 0);
         }
     }
+
+    private void SetGrounded(bool grounded)
+    {
+        isGrounded = grounded;
+        anim.SetBool("Jump", !grounded);
+    }
+
     public void Bounce(float bounceForce)
     {
         myBody.velocity = new Vector2(
@@ -93,7 +103,7 @@ public class PlayerMovement : MonoBehaviour
             bounceForce
         );
 
-        isGrounded = false;
-        anim.SetBool("Jump", true);
+        groundContacts.Clear();
+        SetGrounded(false);
     }
 }

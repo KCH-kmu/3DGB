@@ -13,10 +13,12 @@ public class BeetleCollisionZone : MonoBehaviour
         BeetleCollisionZoneType.Head;
 
     private BeetleMovement beetle;
+    private Collider2D zoneCollider;
 
     private void Awake()
     {
         beetle = GetComponentInParent<BeetleMovement>();
+        zoneCollider = GetComponent<Collider2D>();
     }
 
     private void OnTriggerEnter2D(Collider2D other)
@@ -31,7 +33,11 @@ public class BeetleCollisionZone : MonoBehaviour
 
         if (zoneType == BeetleCollisionZoneType.Head)
         {
-            beetle.TryFreezeFromHead(player);
+            beetle.TryFreezeFromHead(
+                player,
+                other,
+                zoneCollider
+            );
         }
         else
         {

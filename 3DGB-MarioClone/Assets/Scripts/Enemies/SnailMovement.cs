@@ -65,6 +65,23 @@ public class SnailMovement : MonoBehaviour
         }
     }
 
+    private void OnTriggerEnter2D(Collider2D target)
+    {
+        if (!target.CompareTag("Bullet"))
+        {
+            return;
+        }
+
+        // PDF의 동작처럼 첫 피격은 기절, 기절 중의 두 번째 피격은 제거한다.
+        if (animator.GetBool("IsStunned"))
+        {
+            Destroy(gameObject);
+            return;
+        }
+
+        Stun();
+    }
+
     private void HandlePlayerCollision(Collision2D collision)
     {
         PlayerMovement player =

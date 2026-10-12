@@ -4,11 +4,14 @@ using UnityEngine;
 public class PlayerMovement : MonoBehaviour
 {
     [SerializeField] private float speed = 5f;
-    [SerializeField] private float jumpForce = 12f;
+    [SerializeField] private float jumpForce = 14f;
+    [SerializeField] private float groundCheckRadius = 0.12f;
 
     private Rigidbody2D myBody;
     private Animator anim;
     private SpriteRenderer spriteRenderer;
+    private Transform groundCheck;
+    private int groundLayerMask;
 
     private bool isGrounded;
     private readonly HashSet<Collider2D> groundContacts =
@@ -19,6 +22,8 @@ public class PlayerMovement : MonoBehaviour
         myBody = GetComponent<Rigidbody2D>();
         anim = GetComponent<Animator>();
         spriteRenderer = GetComponent<SpriteRenderer>();
+        groundCheck = transform.Find("Groundcheck");
+        groundLayerMask = LayerMask.GetMask("Ground");
     }
 
     private void Update()
@@ -28,7 +33,34 @@ public class PlayerMovement : MonoBehaviour
 
     private void FixedUpdate()
     {
+        RefreshGroundedState();
         PlayerWalk();
+    }
+
+    private void RefreshGroundedState()
+    {
+        if (groundCheck == null)
+        {
+            SetGrounded(groundContacts.Count > 0);
+            return;
+        }
+
+        // 상승 중에는 발밑 원이 아직 지면과 겹쳐 있어도 공중 상태로 유지한다.
+        if (myBody.velocity.y > 0.1f)
+        {
+            SetGrounded(false);
+            return;
+        }
+
+        bool overlapsGround = Physics2D.OverlapCircle(
+            groundCheck.position,
+            groundCheckRadius,
+            groundLayerMask
+        ) != null;
+
+        // 타일 경계를 건너는 한 프레임 동안 Trigger Exit가 먼저 발생해도
+        // 물리 조회 결과로 접지 상태가 끊기지 않도록 한다.
+        SetGrounded(overlapsGround || groundContacts.Count > 0);
     }
 
     private void PlayerWalk()
@@ -86,7 +118,6 @@ public class PlayerMovement : MonoBehaviour
             LayerMask.NameToLayer("Ground"))
         {
             groundContacts.Remove(collision);
-            SetGrounded(groundContacts.Count > 0);
         }
     }
 

@@ -73,6 +73,14 @@ public class BeetleMovement : MonoBehaviour
         }
     }
 
+    private void OnTriggerEnter2D(Collider2D target)
+    {
+        if (target.CompareTag("Bullet"))
+        {
+            Freeze();
+        }
+    }
+
     public void TryFreezeFromHead(
         PlayerMovement player,
         Collider2D playerCollider,
@@ -94,10 +102,10 @@ public class BeetleMovement : MonoBehaviour
         // 걷는 중의 Y 속도 0을 낙하로 판단하지 않는다.
         bool playerIsFalling = playerBody.velocity.y < -0.1f;
 
-        // 플레이어의 실제 발이 머리 판정 영역 위에 있을 때만 밟기로 처리한다.
+        // 빠르게 낙하해 Trigger 중심을 조금 지난 경우도 머리 밟기로 인정한다.
         bool playerFeetAreAboveHead =
             playerCollider.bounds.min.y >=
-            headZoneCollider.bounds.center.y;
+            headZoneCollider.bounds.min.y - 0.05f;
 
         if (!playerIsFalling || !playerFeetAreAboveHead)
         {
@@ -175,5 +183,4 @@ public class BeetleMovement : MonoBehaviour
         // 원본 비틀 스프라이트는 왼쪽을 바라본다.
         spriteRenderer.flipX = moveDirection > 0;
     }
-
 }

@@ -23,6 +23,21 @@ public class BeetleCollisionZone : MonoBehaviour
 
     private void OnTriggerEnter2D(Collider2D other)
     {
+        HandlePlayerCollision(other);
+    }
+
+    private void OnTriggerStay2D(Collider2D other)
+    {
+        // 위로 지나가며 먼저 들어온 뒤 낙하하는 경우에도
+        // 머리 밟기 조건을 계속 검사한다.
+        if (zoneType == BeetleCollisionZoneType.Head)
+        {
+            HandlePlayerCollision(other);
+        }
+    }
+
+    private void HandlePlayerCollision(Collider2D other)
+    {
         PlayerMovement player =
             other.GetComponentInParent<PlayerMovement>();
 

@@ -1,3 +1,4 @@
+using System;
 using System.Collections;
 using UnityEngine;
 
@@ -18,6 +19,7 @@ public class PlayerHealth : MonoBehaviour
     private AudioSource audioSource;
 
     public int CurrentLives => currentLives;
+    public event Action<int> LivesChanged;
 
     private void Awake()
     {
@@ -37,6 +39,11 @@ public class PlayerHealth : MonoBehaviour
         currentLives = startingLives;
     }
 
+    private void Start()
+    {
+        LivesChanged?.Invoke(currentLives);
+    }
+
     public void TakeDamage()
     {
         if (!canTakeDamage || currentLives <= 0)
@@ -45,6 +52,7 @@ public class PlayerHealth : MonoBehaviour
         }
 
         currentLives--;
+        LivesChanged?.Invoke(currentLives);
 
         if (hitSound != null)
         {

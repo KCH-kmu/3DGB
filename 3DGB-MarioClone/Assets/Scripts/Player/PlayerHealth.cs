@@ -1,6 +1,7 @@
 using System;
 using System.Collections;
 using UnityEngine;
+using UnityEngine.SceneManagement;
 
 public class PlayerHealth : MonoBehaviour
 {
@@ -14,18 +15,23 @@ public class PlayerHealth : MonoBehaviour
 
     private int currentLives;
     private bool canTakeDamage = true;
+    private bool hasEnded;
 
-    private PlayerMovement playerMovement;
     private Rigidbody2D myBody;
     private AudioSource audioSource;
+    private Animator playerAnimator;
+    private Collider2D[] playerColliders;
+    private MonoBehaviour[] playerBehaviours;
 
     public int CurrentLives => currentLives;
     public event Action<int> LivesChanged;
 
     private void Awake()
     {
-        playerMovement = GetComponent<PlayerMovement>();
         myBody = GetComponent<Rigidbody2D>();
+        playerAnimator = GetComponent<Animator>();
+        playerColliders = GetComponentsInChildren<Collider2D>(true);
+        playerBehaviours = GetComponents<MonoBehaviour>();
 
         audioSource = GetComponent<AudioSource>();
 
@@ -40,6 +46,14 @@ public class PlayerHealth : MonoBehaviour
         currentLives = startingLives;
     }
 
+    private void Update()
+    {
+        if (hasEnded && Input.GetKeyDown(KeyCode.R))
+        {
+            RestartCurrentScene();
+        }
+    }
+
     private void Start()
     {
         LivesChanged?.Invoke(currentLives);
@@ -47,7 +61,7 @@ public class PlayerHealth : MonoBehaviour
 
     public void TakeDamage()
     {
-        if (!canTakeDamage || currentLives <= 0)
+        if (hasEnded || !canTakeDamage || currentLives <= 0)
         {
             return;
         }
@@ -80,21 +94,66 @@ public class PlayerHealth : MonoBehaviour
 
     private void Die()
     {
+        if (hasEnded)
+        {
+            return;
+        }
+
         canTakeDamage = false;
-
-        if (myBody != null)
-        {
-            myBody.velocity = Vector2.zero;
-        }
-
-        if (playerMovement != null)
-        {
-            playerMovement.enabled = false;
-        }
+        hasEnded = true;
+        LockPlayerInteractions();
 
         StartCoroutine(PlayGameOverSoundAfterHit());
 
         Debug.Log("Player has no lives remaining. Game Over.");
+    }
+
+    public void CompleteLevel()
+    {
+        if (hasEnded)
+        {
+            return;
+        }
+
+        canTakeDamage = false;
+        hasEnded = true;
+        LockPlayerInteractions();
+    }
+
+    private void LockPlayerInteractions()
+    {
+        foreach (MonoBehaviour behaviour in playerBehaviours)
+        {
+            if (behaviour != null && behaviour != this)
+            {
+                behaviour.enabled = false;
+            }
+        }
+
+        if (myBody != null)
+        {
+            myBody.velocity = Vector2.zero;
+            myBody.angularVelocity = 0f;
+            myBody.simulated = false;
+        }
+
+        foreach (Collider2D playerCollider in playerColliders)
+        {
+            if (playerCollider != null)
+            {
+                playerCollider.enabled = false;
+            }
+        }
+
+        if (playerAnimator != null)
+        {
+            playerAnimator.speed = 0f;
+        }
+
+        foreach (FireBullet bullet in FindObjectsOfType<FireBullet>())
+        {
+            Destroy(bullet.gameObject);
+        }
     }
 
     private IEnumerator PlayGameOverSoundAfterHit()
@@ -108,5 +167,20 @@ public class PlayerHealth : MonoBehaviour
         {
             audioSource.PlayOneShot(gameOverSound);
         }
+    }
+
+    private void RestartCurrentScene()
+    {
+        Time.timeScale = 1f;
+
+        Scene activeScene = SceneManager.GetActiveScene();
+
+        if (activeScene.buildIndex >= 0)
+        {
+            SceneManager.LoadScene(activeScene.buildIndex);
+            return;
+        }
+
+        SceneManager.LoadScene(activeScene.name);
     }
 }

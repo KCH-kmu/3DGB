@@ -16,12 +16,17 @@ public static class CodexLevel0Builder
     private const string TerrainPrefabFolder = "Assets/Prefabs/Terrain";
     private const string GroundPrefabPath =
         TerrainPrefabFolder + "/GroundTile.prefab";
+    private const string GeneratedSpriteFolder = "Assets/Sprites/Generated";
+    private const string GroundSeamPatchPath =
+        GeneratedSpriteFolder + "/GroundSeamPatch.png";
     private const string PhysicsFolder = "Assets/Physics";
     private const string PlayerPhysicsMaterialPath =
         PhysicsFolder + "/PlayerFrictionless.physicsMaterial2D";
     private const float PlayerMoveSpeed = 5f;
     private const float PlayerJumpForce = 14f;
     private const float PlayerGravityScale = 3f;
+    private const float GroundTileOverlapScale = 1.03f;
+    private const float CameraMinimumY = 0.5f;
 
     [MenuItem("Tools/Codex/Build Level 0")]
     public static void BuildLevelZero()
@@ -30,12 +35,14 @@ public static class CodexLevel0Builder
         EnsureFolder(EnemyAnimationFolder);
         EnsureFolder(EnemyPrefabFolder);
         EnsureFolder(TerrainPrefabFolder);
+        EnsureFolder(GeneratedSpriteFolder);
         EnsureFolder(PhysicsFolder);
 
         AssetDatabase.SaveAssets();
         AssetDatabase.Refresh();
 
         CreateAdditionalEnemyAssets();
+        CreateGroundSeamPatch();
         CreateGroundPrefab();
         UpdatePlayerPrefabSettings();
 
@@ -102,6 +109,30 @@ public static class CodexLevel0Builder
         AssetDatabase.SaveAssets();
         AssetDatabase.Refresh();
         Debug.Log("Assignment sounds applied.");
+    }
+
+    [MenuItem("Tools/Codex/Apply Terrain and End State Polish")]
+    public static void ApplyTerrainAndEndStatePolish()
+    {
+        EnsureFolder(GeneratedSpriteFolder);
+        AssetDatabase.Refresh();
+        CreateGroundSeamPatch();
+        CreateGroundPrefab();
+
+        Scene scene = EditorSceneManager.OpenScene(
+            ScenePath,
+            OpenSceneMode.Single
+        );
+
+        ApplyGroundSeamCovers();
+        ApplyCameraBottomMargin();
+        EnsureMainSceneInBuildSettings();
+
+        EditorSceneManager.MarkSceneDirty(scene);
+        EditorSceneManager.SaveScene(scene);
+        AssetDatabase.SaveAssets();
+        AssetDatabase.Refresh();
+        Debug.Log("Terrain and end-state polish applied.");
     }
 
     public static void CaptureLevelPreviewsOnly()
@@ -463,6 +494,11 @@ public static class CodexLevel0Builder
         try
         {
             root.layer = LayerMask.NameToLayer("Ground");
+            root.transform.localScale = new Vector3(
+                GroundTileOverlapScale,
+                1f,
+                1f
+            );
 
             SpriteRenderer renderer = root.AddComponent<SpriteRenderer>();
             renderer.sprite = ground;
@@ -477,6 +513,89 @@ public static class CodexLevel0Builder
         {
             UnityEngine.Object.DestroyImmediate(root);
         }
+    }
+
+    private static Sprite CreateGroundSeamPatch()
+    {
+        Sprite ground = LoadSprite(
+            "Assets/Sprites/Tileset/Tileset_0.png",
+            "Tileset_0_ground0"
+        );
+        string sourcePath = Path.Combine(
+            Application.dataPath,
+            "Sprites/Tileset/Tileset_0.png"
+        );
+        Texture2D source = new Texture2D(
+            2,
+            2,
+            TextureFormat.RGBA32,
+            false
+        );
+
+        if (!source.LoadImage(File.ReadAllBytes(sourcePath)))
+        {
+            UnityEngine.Object.DestroyImmediate(source);
+            throw new InvalidOperationException(
+                "Tileset_0 could not be read for the ground seam patch."
+            );
+        }
+
+        Rect groundRect = ground.rect;
+        int patchWidth = Mathf.Min(32, Mathf.RoundToInt(groundRect.width));
+        int patchHeight = Mathf.RoundToInt(groundRect.height);
+        int patchX = Mathf.RoundToInt(
+            groundRect.x + (groundRect.width - patchWidth) * 0.5f
+        );
+        int patchY = Mathf.RoundToInt(groundRect.y);
+        Color[] patchPixels = source.GetPixels(
+            patchX,
+            patchY,
+            patchWidth,
+            patchHeight
+        );
+        Texture2D patch = new Texture2D(
+            patchWidth,
+            patchHeight,
+            TextureFormat.RGBA32,
+            false
+        );
+        patch.SetPixels(patchPixels);
+        patch.Apply();
+
+        string outputPath = Path.Combine(
+            Application.dataPath,
+            "Sprites/Generated/GroundSeamPatch.png"
+        );
+        File.WriteAllBytes(outputPath, patch.EncodeToPNG());
+        UnityEngine.Object.DestroyImmediate(source);
+        UnityEngine.Object.DestroyImmediate(patch);
+
+        AssetDatabase.ImportAsset(
+            GroundSeamPatchPath,
+            ImportAssetOptions.ForceUpdate
+        );
+        TextureImporter importer = AssetImporter.GetAtPath(
+            GroundSeamPatchPath
+        ) as TextureImporter;
+
+        if (importer == null)
+        {
+            throw new InvalidOperationException(
+                "Ground seam patch importer was not created."
+            );
+        }
+
+        importer.textureType = TextureImporterType.Sprite;
+        importer.spriteImportMode = SpriteImportMode.Single;
+        importer.spritePixelsPerUnit = 100f;
+        importer.mipmapEnabled = false;
+        importer.alphaIsTransparency = true;
+        importer.filterMode = FilterMode.Bilinear;
+        importer.wrapMode = TextureWrapMode.Clamp;
+        importer.textureCompression = TextureImporterCompression.Uncompressed;
+        importer.SaveAndReimport();
+
+        return AssetDatabase.LoadAssetAtPath<Sprite>(GroundSeamPatchPath);
     }
 
     private static void UpdatePlayerPrefabSettings()
@@ -853,11 +972,21 @@ public static class CodexLevel0Builder
         }
 
         CameraFollow2D follow = GetOrAddComponent<CameraFollow2D>(camera.gameObject);
-        follow.Configure(player.transform, -5f, 96f, 0f, 2.5f);
+        follow.Configure(
+            player.transform,
+            -5f,
+            96f,
+            CameraMinimumY,
+            2.5f
+        );
 
         camera.orthographic = true;
         camera.orthographicSize = 5f;
-        camera.transform.position = new Vector3(-5f, 0f, -10f);
+        camera.transform.position = new Vector3(
+            -5f,
+            CameraMinimumY,
+            -10f
+        );
         camera.backgroundColor = new Color(0.18f, 0.55f, 0.72f, 1f);
         return player;
     }
@@ -1106,6 +1235,137 @@ public static class CodexLevel0Builder
 
             index++;
         }
+
+        CreateGroundSeamCovers(group.transform);
+    }
+
+    private static void ApplyGroundSeamCovers()
+    {
+        string[] sectionNames =
+        {
+            "Ground_A",
+            "Ground_B",
+            "Ground_C",
+            "Ground_D"
+        };
+
+        foreach (string sectionName in sectionNames)
+        {
+            GameObject section = GameObject.Find(sectionName);
+
+            if (section != null)
+            {
+                CreateGroundSeamCovers(section.transform);
+            }
+        }
+    }
+
+    private static void CreateGroundSeamCovers(Transform section)
+    {
+        for (int index = section.childCount - 1; index >= 0; index--)
+        {
+            Transform child = section.GetChild(index);
+
+            if (child.name.Contains("_Seam_"))
+            {
+                UnityEngine.Object.DestroyImmediate(child.gameObject);
+            }
+        }
+
+        Sprite seamPatch = AssetDatabase.LoadAssetAtPath<Sprite>(
+            GroundSeamPatchPath
+        );
+
+        if (seamPatch == null)
+        {
+            throw new InvalidOperationException(
+                "Ground seam patch was not found."
+            );
+        }
+
+        List<Transform> groundTiles = new List<Transform>();
+
+        foreach (Transform child in section)
+        {
+            if (
+                child.GetComponent<SpriteRenderer>() != null &&
+                !child.name.Contains("_Seam_")
+            )
+            {
+                groundTiles.Add(child);
+            }
+        }
+
+        groundTiles.Sort(
+            (left, right) => left.position.x.CompareTo(right.position.x)
+        );
+
+        float maximumNeighbourDistance = 2.2f;
+
+        for (int index = 0; index < groundTiles.Count - 1; index++)
+        {
+            Transform left = groundTiles[index];
+            Transform right = groundTiles[index + 1];
+            float distance = right.position.x - left.position.x;
+
+            if (distance <= 0f || distance > maximumNeighbourDistance)
+            {
+                continue;
+            }
+
+            Vector3 seamPosition = new Vector3(
+                (left.position.x + right.position.x) * 0.5f,
+                (left.position.y + right.position.y) * 0.5f,
+                left.position.z
+            );
+            GameObject seam = CreateSpriteObject(
+                section.name + "_Seam_" + index,
+                seamPatch,
+                seamPosition,
+                Vector3.one,
+                section,
+                1
+            );
+            seam.layer = LayerMask.NameToLayer("Ground");
+        }
+    }
+
+    private static void ApplyCameraBottomMargin()
+    {
+        Camera camera = Camera.main;
+        PlayerMovement player =
+            UnityEngine.Object.FindObjectOfType<PlayerMovement>();
+
+        if (camera == null || player == null)
+        {
+            throw new InvalidOperationException(
+                "Player or Main Camera was not found."
+            );
+        }
+
+        CameraFollow2D follow = GetOrAddComponent<CameraFollow2D>(
+            camera.gameObject
+        );
+        follow.Configure(
+            player.transform,
+            -5f,
+            96f,
+            CameraMinimumY,
+            2.5f
+        );
+        Vector3 cameraPosition = camera.transform.position;
+        cameraPosition.y = Mathf.Max(cameraPosition.y, CameraMinimumY);
+        camera.transform.position = cameraPosition;
+        EditorUtility.SetDirty(camera.gameObject);
+    }
+
+    private static void EnsureMainSceneInBuildSettings()
+    {
+        List<EditorBuildSettingsScene> scenes =
+            new List<EditorBuildSettingsScene>(EditorBuildSettings.scenes);
+        scenes.RemoveAll(scene => scene.path == ScenePath);
+        scenes.Insert(0, new EditorBuildSettingsScene(ScenePath, true));
+        EditorBuildSettings.scenes = scenes.ToArray();
     }
 
     private static void CreateBlockRow(

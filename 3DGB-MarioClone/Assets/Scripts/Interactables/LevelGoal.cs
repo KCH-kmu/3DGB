@@ -47,14 +47,24 @@ public class LevelGoal : MonoBehaviour
             audioSource.PlayOneShot(levelCompleteSound, 0.9f);
         }
 
-        Rigidbody2D playerBody = player.GetComponent<Rigidbody2D>();
+        PlayerHealth playerHealth = player.GetComponent<PlayerHealth>();
 
-        if (playerBody != null)
+        if (playerHealth != null)
         {
-            playerBody.velocity = Vector2.zero;
+            playerHealth.CompleteLevel();
         }
+        else
+        {
+            Rigidbody2D playerBody = player.GetComponent<Rigidbody2D>();
 
-        player.enabled = false;
+            if (playerBody != null)
+            {
+                playerBody.velocity = Vector2.zero;
+                playerBody.simulated = false;
+            }
+
+            player.enabled = false;
+        }
 
         GameHUD hud = FindObjectOfType<GameHUD>();
 

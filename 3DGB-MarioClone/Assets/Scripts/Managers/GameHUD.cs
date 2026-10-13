@@ -70,7 +70,7 @@ public class GameHUD : MonoBehaviour
 
     public void ShowLevelComplete()
     {
-        ShowMessage("LEVEL COMPLETE!");
+        ShowMessage("LEVEL COMPLETE!\nPRESS R TO RESTART");
     }
 
     private void OnLivesChanged(int lives)
@@ -82,7 +82,7 @@ public class GameHUD : MonoBehaviour
 
         if (lives <= 0)
         {
-            ShowMessage("GAME OVER");
+            ShowMessage("GAME OVER\nPRESS R TO RESTART");
         }
     }
 

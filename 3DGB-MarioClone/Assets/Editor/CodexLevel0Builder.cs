@@ -25,6 +25,12 @@ public static class CodexLevel0Builder
     private const float PlayerMoveSpeed = 5f;
     private const float PlayerJumpForce = 14f;
     private const float PlayerGravityScale = 3f;
+    private const float PlayerColliderEdgeRadius = 0.05f;
+    private const float PlayerColliderCoreWidth = 0.64f;
+    private const float PlayerColliderCoreHeight = 1.06f;
+    private const float PlayerGroundCheckY = -0.58f;
+    private const float PlayerGroundedStartY = -2.74f;
+    private const float GroundSurfaceY = -3.32f;
     private const float GroundTileOverlapScale = 1.03f;
     private const float CameraMinimumY = 0.5f;
 
@@ -237,7 +243,7 @@ public static class CodexLevel0Builder
             RigidbodyType2D.Dynamic,
             3f,
             new Vector2(0.82f, 0.58f),
-            new Vector2(0f, -0.12f),
+            new Vector2(0f, -0.193333f),
             false,
             new Dictionary<string, float>
             {
@@ -256,7 +262,7 @@ public static class CodexLevel0Builder
             RigidbodyType2D.Dynamic,
             3f,
             new Vector2(0.72f, 0.65f),
-            new Vector2(0f, -0.1f),
+            new Vector2(0f, -0.175f),
             true,
             new Dictionary<string, float>
             {
@@ -275,7 +281,7 @@ public static class CodexLevel0Builder
             RigidbodyType2D.Dynamic,
             3f,
             new Vector2(0.68f, 0.64f),
-            new Vector2(0f, -0.12f),
+            new Vector2(0f, -0.140784f),
             true,
             null
         );
@@ -336,7 +342,7 @@ public static class CodexLevel0Builder
                     spriteSize.x * 0.68f,
                     spriteSize.y * 0.82f
                 );
-                collider.offset = new Vector2(0f, -spriteSize.y * 0.08f);
+                collider.offset = new Vector2(0f, -spriteSize.y * 0.09f);
             }
 
             CactusEnemy cactus = GetOrAddComponent<CactusEnemy>(root);
@@ -670,9 +676,28 @@ public static class CodexLevel0Builder
 
             if (playerCollider != null)
             {
-                playerCollider.edgeRadius = 0.05f;
+                // Edge Radius expands outside the box. Keep the rounded edge,
+                // but shrink the core so the final collision outline ends at
+                // Mario's visible feet instead of below them.
+                playerCollider.size = new Vector2(
+                    PlayerColliderCoreWidth,
+                    PlayerColliderCoreHeight
+                );
+                playerCollider.offset = Vector2.zero;
+                playerCollider.edgeRadius = PlayerColliderEdgeRadius;
                 playerCollider.sharedMaterial =
                     CreatePlayerPhysicsMaterial();
+            }
+
+            Transform groundCheck = root.transform.Find("Groundcheck");
+
+            if (groundCheck != null)
+            {
+                groundCheck.localPosition = new Vector3(
+                    0f,
+                    PlayerGroundCheckY,
+                    0f
+                );
             }
 
             PrefabUtility.SaveAsPrefabAsset(root, playerPrefabPath);
@@ -858,30 +883,30 @@ public static class CodexLevel0Builder
         Scene scene
     )
     {
-        PlacePrefab(
+        PlaceGroundedPrefab(
             EnemyPrefabFolder + "/Cactus.prefab",
-            new Vector3(16.5f, -2.4f, 0f),
+            16.5f,
             parent,
             scene,
             "Cactus_Level0"
         );
-        PlacePrefab(
+        PlaceGroundedPrefab(
             EnemyPrefabFolder + "/Hedgehog.prefab",
-            new Vector3(22f, -2.2f, 0f),
+            22f,
             parent,
             scene,
             "Hedgehog_Level0"
         );
-        PlacePrefab(
+        PlaceGroundedPrefab(
             EnemyPrefabFolder + "/Spider.prefab",
-            new Vector3(38f, -2.1f, 0f),
+            38f,
             parent,
             scene,
             "Spider_Level0"
         );
-        PlacePrefab(
+        PlaceGroundedPrefab(
             EnemyPrefabFolder + "/Frog.prefab",
-            new Vector3(44f, -2f, 0f),
+            44f,
             parent,
             scene,
             "Frog_Level0"
@@ -893,16 +918,16 @@ public static class CodexLevel0Builder
             scene,
             "Bird_Level0"
         );
-        PlacePrefab(
+        PlaceGroundedPrefab(
             EnemyPrefabFolder + "/Hedgehog.prefab",
-            new Vector3(67.5f, -2.2f, 0f),
+            67.5f,
             parent,
             scene,
             "Hedgehog_Level0_2"
         );
-        PlacePrefab(
+        PlaceGroundedPrefab(
             EnemyPrefabFolder + "/Spider.prefab",
-            new Vector3(88f, -2.1f, 0f),
+            88f,
             parent,
             scene,
             "Spider_Level0_2"
@@ -961,7 +986,11 @@ public static class CodexLevel0Builder
         ) as GameObject;
         playerObject.name = "Player";
         playerObject.transform.SetParent(parent);
-        playerObject.transform.position = new Vector3(-7f, -2.5f, 0f);
+        playerObject.transform.position = new Vector3(
+            -7f,
+            PlayerGroundedStartY,
+            0f
+        );
 
         PlayerMovement player = playerObject.GetComponent<PlayerMovement>();
         Camera camera = Camera.main;
@@ -1655,7 +1684,42 @@ public static class CodexLevel0Builder
         }
     }
 
-    private static void PlacePrefab(
+    private static GameObject PlaceGroundedPrefab(
+        string prefabPath,
+        float x,
+        Transform parent,
+        Scene scene,
+        string instanceName
+    )
+    {
+        GameObject instance = PlacePrefab(
+            prefabPath,
+            new Vector3(x, 0f, 0f),
+            parent,
+            scene,
+            instanceName
+        );
+        Collider2D collider = instance.GetComponent<Collider2D>();
+
+        if (collider == null)
+        {
+            throw new InvalidOperationException(
+                instanceName + " does not have a Collider2D."
+            );
+        }
+
+        Physics2D.SyncTransforms();
+        float bottomOffset =
+            collider.bounds.min.y - instance.transform.position.y;
+        instance.transform.position = new Vector3(
+            x,
+            GroundSurfaceY - bottomOffset,
+            0f
+        );
+        return instance;
+    }
+
+    private static GameObject PlacePrefab(
         string prefabPath,
         Vector3 position,
         Transform parent,
@@ -1678,6 +1742,7 @@ public static class CodexLevel0Builder
         instance.name = instanceName;
         instance.transform.SetParent(parent);
         instance.transform.position = position;
+        return instance;
     }
 
     private static GameObject CreateSolidSprite(

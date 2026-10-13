@@ -10,6 +10,7 @@ public class PlayerHealth : MonoBehaviour
 
     [Header("Sound")]
     [SerializeField] private AudioClip hitSound;
+    [SerializeField] private AudioClip gameOverSound;
 
     private int currentLives;
     private bool canTakeDamage = true;
@@ -91,6 +92,21 @@ public class PlayerHealth : MonoBehaviour
             playerMovement.enabled = false;
         }
 
+        StartCoroutine(PlayGameOverSoundAfterHit());
+
         Debug.Log("Player has no lives remaining. Game Over.");
+    }
+
+    private IEnumerator PlayGameOverSoundAfterHit()
+    {
+        if (hitSound != null)
+        {
+            yield return new WaitForSecondsRealtime(hitSound.length);
+        }
+
+        if (gameOverSound != null)
+        {
+            audioSource.PlayOneShot(gameOverSound);
+        }
     }
 }

@@ -7,9 +7,13 @@ public class PlayerMovement : MonoBehaviour
     [SerializeField] private float jumpForce = 14f;
     [SerializeField] private float groundCheckRadius = 0.12f;
 
+    [Header("Sound")]
+    [SerializeField] private AudioClip jumpSound;
+
     private Rigidbody2D myBody;
     private Animator anim;
     private SpriteRenderer spriteRenderer;
+    private AudioSource audioSource;
     private Transform groundCheck;
     private int groundLayerMask;
 
@@ -22,6 +26,15 @@ public class PlayerMovement : MonoBehaviour
         myBody = GetComponent<Rigidbody2D>();
         anim = GetComponent<Animator>();
         spriteRenderer = GetComponent<SpriteRenderer>();
+        audioSource = GetComponent<AudioSource>();
+
+        if (audioSource == null)
+        {
+            audioSource = gameObject.AddComponent<AudioSource>();
+        }
+
+        audioSource.playOnAwake = false;
+        audioSource.spatialBlend = 0f;
         groundCheck = transform.Find("Groundcheck");
         groundLayerMask = LayerMask.GetMask("Ground");
     }
@@ -91,6 +104,11 @@ public class PlayerMovement : MonoBehaviour
         {
             myBody.velocity =
                 new Vector2(myBody.velocity.x, jumpForce);
+
+            if (jumpSound != null)
+            {
+                audioSource.PlayOneShot(jumpSound, 0.85f);
+            }
 
             groundContacts.Clear();
             SetGrounded(false);

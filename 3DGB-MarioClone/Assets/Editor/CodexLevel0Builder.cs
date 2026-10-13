@@ -58,6 +58,52 @@ public static class CodexLevel0Builder
         Debug.Log("Codex Level 0 build completed.");
     }
 
+    [MenuItem("Tools/Codex/Apply Assignment Sounds")]
+    public static void ApplyAssignmentSounds()
+    {
+        EnsureFolder(PhysicsFolder);
+        AssetDatabase.Refresh();
+        UpdatePlayerPrefabSettings();
+
+        Scene scene = EditorSceneManager.OpenScene(
+            ScenePath,
+            OpenSceneMode.Single
+        );
+
+        AudioClip coinSound = AssetDatabase.LoadAssetAtPath<AudioClip>(
+            "Assets/Sounds/coin.ogg"
+        );
+        AudioClip levelCompleteSound =
+            AssetDatabase.LoadAssetAtPath<AudioClip>(
+                "Assets/Sounds/levelclear.mp3"
+            );
+
+        foreach (
+            CoinPickup pickup in
+            UnityEngine.Object.FindObjectsOfType<CoinPickup>(true)
+        )
+        {
+            pickup.Configure(coinSound);
+            EditorUtility.SetDirty(pickup);
+        }
+
+        foreach (
+            LevelGoal goal in
+            UnityEngine.Object.FindObjectsOfType<LevelGoal>(true)
+        )
+        {
+            goal.Configure(levelCompleteSound);
+            ConfigureTwoDimensionalAudio(goal.gameObject);
+            EditorUtility.SetDirty(goal);
+        }
+
+        EditorSceneManager.MarkSceneDirty(scene);
+        EditorSceneManager.SaveScene(scene);
+        AssetDatabase.SaveAssets();
+        AssetDatabase.Refresh();
+        Debug.Log("Assignment sounds applied.");
+    }
+
     public static void CaptureLevelPreviewsOnly()
     {
         EditorSceneManager.OpenScene(ScenePath, OpenSceneMode.Single);
@@ -455,7 +501,44 @@ public static class CodexLevel0Builder
                 PlayerMoveSpeed;
             serializedMovement.FindProperty("jumpForce").floatValue =
                 PlayerJumpForce;
+            serializedMovement.FindProperty("jumpSound").objectReferenceValue =
+                AssetDatabase.LoadAssetAtPath<AudioClip>(
+                    "Assets/Sounds/jump.ogg"
+                );
             serializedMovement.ApplyModifiedPropertiesWithoutUndo();
+
+            PlayerHealth health = root.GetComponent<PlayerHealth>();
+
+            if (health != null)
+            {
+                SerializedObject serializedHealth =
+                    new SerializedObject(health);
+                serializedHealth.FindProperty("hitSound").objectReferenceValue =
+                    AssetDatabase.LoadAssetAtPath<AudioClip>(
+                        "Assets/Sounds/hit.wav"
+                    );
+                serializedHealth.FindProperty("gameOverSound")
+                    .objectReferenceValue =
+                    AssetDatabase.LoadAssetAtPath<AudioClip>(
+                        "Assets/Sounds/gameover_after_hit.wav"
+                    );
+                serializedHealth.ApplyModifiedPropertiesWithoutUndo();
+            }
+
+            PlayerShoot shoot = root.GetComponent<PlayerShoot>();
+
+            if (shoot != null)
+            {
+                SerializedObject serializedShoot =
+                    new SerializedObject(shoot);
+                serializedShoot.FindProperty("shootSound").objectReferenceValue =
+                    AssetDatabase.LoadAssetAtPath<AudioClip>(
+                        "Assets/Sounds/boss7_shot.mp3"
+                    );
+                serializedShoot.ApplyModifiedPropertiesWithoutUndo();
+            }
+
+            ConfigureTwoDimensionalAudio(root);
 
             Rigidbody2D playerBody = root.GetComponent<Rigidbody2D>();
 
@@ -624,7 +707,7 @@ public static class CodexLevel0Builder
             "Coins_Pit3"
         );
         PlaceJumpTrajectoryCoins(
-            new Vector2(89.2f, 0.8f),
+            new Vector2(93.7f, 1.8f),
             7,
             obstacleParent,
             "Coins_FinalSteps"
@@ -730,7 +813,13 @@ public static class CodexLevel0Builder
         BoxCollider2D collider = goal.AddComponent<BoxCollider2D>();
         collider.isTrigger = true;
         collider.size = castle.bounds.size;
-        goal.AddComponent<LevelGoal>();
+        LevelGoal levelGoal = goal.AddComponent<LevelGoal>();
+        levelGoal.Configure(
+            AssetDatabase.LoadAssetAtPath<AudioClip>(
+                "Assets/Sounds/levelclear.mp3"
+            )
+        );
+        ConfigureTwoDimensionalAudio(goal);
     }
 
     private static PlayerMovement SetupPlayerAndCamera(
@@ -1551,6 +1640,17 @@ public static class CodexLevel0Builder
     {
         T component = gameObject.GetComponent<T>();
         return component != null ? component : gameObject.AddComponent<T>();
+    }
+
+    private static AudioSource ConfigureTwoDimensionalAudio(
+        GameObject gameObject
+    )
+    {
+        AudioSource source = GetOrAddComponent<AudioSource>(gameObject);
+        source.playOnAwake = false;
+        source.loop = false;
+        source.spatialBlend = 0f;
+        return source;
     }
 
     private static PhysicsMaterial2D CreatePlayerPhysicsMaterial()

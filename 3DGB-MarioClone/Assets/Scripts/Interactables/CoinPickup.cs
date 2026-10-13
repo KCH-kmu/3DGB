@@ -19,11 +19,14 @@ public class CoinPickup : MonoBehaviour
 
         if (pickupSound != null)
         {
-            AudioSource.PlayClipAtPoint(
-                pickupSound,
-                transform.position,
-                0.75f
-            );
+            GameObject soundObject = new GameObject("CoinPickupSound");
+            AudioSource source = soundObject.AddComponent<AudioSource>();
+            source.clip = pickupSound;
+            source.playOnAwake = false;
+            source.spatialBlend = 0f;
+            source.volume = 0.75f;
+            source.Play();
+            Destroy(soundObject, pickupSound.length + 0.1f);
         }
 
         GameHUD hud = FindObjectOfType<GameHUD>();

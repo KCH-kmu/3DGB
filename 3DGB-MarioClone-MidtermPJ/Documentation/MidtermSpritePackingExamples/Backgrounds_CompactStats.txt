@@ -1,0 +1,8 @@
+Atlas: Backgrounds.png
+Sprites: 66
+Before: 2048x1024 (2,097,152 pixels)
+After: 1880x856 (1,609,280 pixels)
+Area reduction: 23.26%
+Rectangle fill before: 67.45%
+Rectangle fill after: 87.90%
+Gutter: 8px

@@ -1,0 +1,8 @@
+Atlas: Hero.png
+Sprites: 66
+Before: 2048x1024 (2,097,152 pixels)
+After: 1588x696 (1,105,248 pixels)
+Area reduction: 47.30%
+Rectangle fill before: 42.56%
+Rectangle fill after: 80.75%
+Gutter: 8px

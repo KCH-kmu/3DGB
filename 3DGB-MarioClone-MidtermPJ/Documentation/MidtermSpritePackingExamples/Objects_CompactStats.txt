@@ -1,0 +1,8 @@
+Atlas: Objects.png
+Sprites: 92
+Before: 2048x512 (1,048,576 pixels)
+After: 1592x472 (751,424 pixels)
+Area reduction: 28.34%
+Rectangle fill before: 55.18%
+Rectangle fill after: 77.00%
+Gutter: 8px

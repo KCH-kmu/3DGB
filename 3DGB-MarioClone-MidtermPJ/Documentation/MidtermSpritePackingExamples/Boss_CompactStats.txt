@@ -1,0 +1,8 @@
+Atlas: Boss.png
+Sprites: 79
+Before: 2048x1024 (2,097,152 pixels)
+After: 1048x1016 (1,064,768 pixels)
+Area reduction: 49.23%
+Rectangle fill before: 40.19%
+Rectangle fill after: 79.16%
+Gutter: 8px

@@ -1,0 +1,8 @@
+Atlas: UI.png
+Sprites: 103
+Before: 2048x1024 (2,097,152 pixels)
+After: 1688x760 (1,282,880 pixels)
+Area reduction: 38.83%
+Rectangle fill before: 51.33%
+Rectangle fill after: 83.91%
+Gutter: 8px

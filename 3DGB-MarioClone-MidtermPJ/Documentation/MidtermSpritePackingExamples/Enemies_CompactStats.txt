@@ -1,0 +1,8 @@
+Atlas: Enemies.png
+Sprites: 79
+Before: 2048x512 (1,048,576 pixels)
+After: 1684x376 (633,184 pixels)
+Area reduction: 39.61%
+Rectangle fill before: 46.80%
+Rectangle fill after: 77.50%
+Gutter: 8px

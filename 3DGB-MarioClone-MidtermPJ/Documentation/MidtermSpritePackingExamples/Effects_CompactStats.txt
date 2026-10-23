@@ -1,0 +1,8 @@
+Atlas: Effects.png
+Sprites: 74
+Before: 2048x512 (1,048,576 pixels)
+After: 980x504 (493,920 pixels)
+Area reduction: 52.90%
+Rectangle fill before: 35.82%
+Rectangle fill after: 76.05%
+Gutter: 8px

@@ -25,15 +25,15 @@ public class BossEnemy : MonoBehaviour
     [SerializeField, Min(0.1f)] private float patrolSpeed = 1.5f;
 
     [Header("Charge Attack")]
-    [SerializeField, Min(0.1f)] private float detectionRange = 7f;
-    [SerializeField, Min(0.1f)] private float chargeSpeed = 5f;
-    [SerializeField, Min(0f)] private float windupDuration = 0.5f;
-    [SerializeField, Min(0.1f)] private float chargeDuration = 1.1f;
-    [SerializeField, Min(0f)] private float recoveryDuration = 0.7f;
+    [SerializeField, Min(0.1f)] private float detectionRange = 9f;
+    [SerializeField, Min(0.1f)] private float chargeSpeed = 6.5f;
+    [SerializeField, Min(0f)] private float windupDuration = 0.35f;
+    [SerializeField, Min(0.1f)] private float chargeDuration = 1.4f;
+    [SerializeField, Min(0f)] private float recoveryDuration = 0.55f;
 
     [Header("Player Interaction")]
     [SerializeField, Min(0.1f)] private float stompBounceForce = 9f;
-    [SerializeField, Min(0f)] private float hitCooldown = 0.15f;
+    [SerializeField, Min(0f)] private float hitCooldown = 1f;
 
     private Rigidbody2D myBody;
     private SpriteRenderer bossSprite;
@@ -46,11 +46,16 @@ public class BossEnemy : MonoBehaviour
     private float stateTimer;
     private float nextAllowedHitTime;
     private Coroutine hitFlashRoutine;
+    private Coroutine playerPassThroughRoutine;
+    private Collider2D ignoredPlayerCollider;
     private bool encounterStarted;
 
     public int CurrentHealth => currentHealth;
     public int MaxHealth => maxHealth;
-    public bool IsDefeated => state == BossState.Defeated;
+    
+    public bool IsTemporarilyInvulnerable =>
+        !IsDefeated && Time.time < nextAllowedHitTime;
+public bool IsDefeated => state == BossState.Defeated;
 
     private void Awake()
     {
@@ -73,7 +78,7 @@ public class BossEnemy : MonoBehaviour
         FaceDirection(moveDirection);
     }
 
-    private void FixedUpdate()
+private void FixedUpdate()
     {
         if (state == BossState.Defeated)
         {
@@ -90,6 +95,13 @@ public class BossEnemy : MonoBehaviour
 
             case BossState.Windup:
                 myBody.velocity = new Vector2(0f, myBody.velocity.y);
+
+                if (player != null)
+                {
+                    FaceDirection(
+                        player.position.x >= transform.position.x ? 1 : -1
+                    );
+                }
 
                 if (stateTimer <= 0f)
                 {
@@ -175,19 +187,22 @@ public class BossEnemy : MonoBehaviour
         stateTimer = chargeDuration;
     }
 
-    private void UpdateCharge()
+private void UpdateCharge()
     {
         float halfWidth = bossCollider.bounds.extents.x;
         float minimumX = patrolLeftX + halfWidth;
         float maximumX = patrolRightX - halfWidth;
-        float clampedX = Mathf.Clamp(
-            transform.position.x,
-            minimumX,
-            maximumX
-        );
+        bool reachedBoundary =
+            (moveDirection < 0 && transform.position.x <= minimumX + 0.02f) ||
+            (moveDirection > 0 && transform.position.x >= maximumX - 0.02f);
 
-        if (!Mathf.Approximately(clampedX, transform.position.x))
+        if (reachedBoundary)
         {
+            float clampedX = Mathf.Clamp(
+                transform.position.x,
+                minimumX,
+                maximumX
+            );
             myBody.position = new Vector2(clampedX, myBody.position.y);
             BeginRecovery();
             return;
@@ -197,6 +212,7 @@ public class BossEnemy : MonoBehaviour
             moveDirection * chargeSpeed,
             myBody.velocity.y
         );
+        FaceDirection(moveDirection);
 
         if (stateTimer <= 0f)
         {
@@ -217,7 +233,17 @@ public class BossEnemy : MonoBehaviour
         bossSprite.flipX = direction < 0;
     }
 
-    private void OnCollisionEnter2D(Collision2D collision)
+private void OnCollisionEnter2D(Collision2D collision)
+    {
+        HandlePlayerCollision(collision);
+    }
+
+private void OnCollisionStay2D(Collision2D collision)
+    {
+        HandlePlayerCollision(collision);
+    }
+
+private void HandlePlayerCollision(Collision2D collision)
     {
         if (IsDefeated)
         {
@@ -236,13 +262,22 @@ public class BossEnemy : MonoBehaviour
         Rigidbody2D playerBody = playerMovement.GetComponent<Rigidbody2D>();
         bool movingDownward =
             playerBody == null || playerBody.velocity.y <= 0.1f;
-        bool landedOnTop =
+        bool playerIsOnTop =
             playerCollider != null &&
-            playerCollider.bounds.min.y >= bossCollider.bounds.max.y - 0.35f;
+            playerCollider.bounds.center.y > bossCollider.bounds.center.y &&
+            playerCollider.bounds.min.y >=
+                bossCollider.bounds.max.y - 0.35f;
 
-        if (movingDownward && landedOnTop)
+        // While invulnerable the stomp collider is temporarily ignored.
+        // This guard prevents damage if a queued contact callback still runs.
+        if (IsTemporarilyInvulnerable)
         {
-            ReceiveHit();
+            return;
+        }
+
+        if (movingDownward && playerIsOnTop)
+        {
+            ReceiveHit(playerCollider);
             playerMovement.Bounce(stompBounceForce);
             return;
         }
@@ -256,6 +291,8 @@ public class BossEnemy : MonoBehaviour
         }
     }
 
+
+
     private void OnTriggerEnter2D(Collider2D other)
     {
         if (other.GetComponentInParent<FireBullet>() != null)
@@ -264,9 +301,11 @@ public class BossEnemy : MonoBehaviour
         }
     }
 
-    public void ReceiveHit()
+public void ReceiveHit(
+        Collider2D stompingPlayerCollider = null
+    )
     {
-        if (IsDefeated || Time.time < nextAllowedHitTime)
+        if (IsDefeated || IsTemporarilyInvulnerable)
         {
             return;
         }
@@ -281,6 +320,14 @@ public class BossEnemy : MonoBehaviour
             return;
         }
 
+        if (stompingPlayerCollider != null)
+        {
+            BeginPlayerPassThrough(stompingPlayerCollider);
+        }
+
+        BeginRecovery();
+        stateTimer = Mathf.Max(recoveryDuration, hitCooldown);
+
         if (hitFlashRoutine != null)
         {
             StopCoroutine(hitFlashRoutine);
@@ -289,11 +336,30 @@ public class BossEnemy : MonoBehaviour
         hitFlashRoutine = StartCoroutine(FlashAfterHit());
     }
 
-    private IEnumerator FlashAfterHit()
+private IEnumerator FlashAfterHit()
     {
         Color originalColor = bossSprite.color;
-        bossSprite.color = new Color(1f, 0.35f, 0.35f, 1f);
-        yield return new WaitForSeconds(0.1f);
+        Color fadedColor = new Color(
+            originalColor.r,
+            originalColor.g,
+            originalColor.b,
+            0.28f
+        );
+        const float blinkInterval = 0.09f;
+
+        while (!IsDefeated && Time.time < nextAllowedHitTime)
+        {
+            bossSprite.color = fadedColor;
+            yield return new WaitForSeconds(blinkInterval);
+
+            if (IsDefeated || Time.time >= nextAllowedHitTime)
+            {
+                break;
+            }
+
+            bossSprite.color = originalColor;
+            yield return new WaitForSeconds(blinkInterval);
+        }
 
         if (!IsDefeated)
         {
@@ -303,7 +369,7 @@ public class BossEnemy : MonoBehaviour
         hitFlashRoutine = null;
     }
 
-    private void Defeat()
+private void Defeat()
     {
         if (IsDefeated)
         {
@@ -311,6 +377,7 @@ public class BossEnemy : MonoBehaviour
         }
 
         state = BossState.Defeated;
+        RestoreIgnoredPlayerCollision();
         myBody.velocity = Vector2.zero;
         myBody.simulated = false;
         bossCollider.enabled = false;
@@ -393,5 +460,96 @@ public class BossEnemy : MonoBehaviour
         }
 
         return null;
+    }
+
+
+private void OnDisable()
+    {
+        RestoreIgnoredPlayerCollision();
+    }
+
+
+private void RestoreIgnoredPlayerCollision()
+    {
+        if (playerPassThroughRoutine != null)
+        {
+            StopCoroutine(playerPassThroughRoutine);
+            playerPassThroughRoutine = null;
+        }
+
+        if (
+            ignoredPlayerCollider != null &&
+            bossCollider != null
+        )
+        {
+            Physics2D.IgnoreCollision(
+                ignoredPlayerCollider,
+                bossCollider,
+                false
+            );
+        }
+
+        ignoredPlayerCollider = null;
+    }
+
+
+private IEnumerator RestorePlayerCollisionAfterInvulnerability(
+        Collider2D playerCollider
+    )
+    {
+        while (!IsDefeated && Time.time < nextAllowedHitTime)
+        {
+            yield return null;
+        }
+
+        while (
+            !IsDefeated &&
+            playerCollider != null &&
+            bossCollider != null &&
+            playerCollider.enabled &&
+            bossCollider.enabled &&
+            playerCollider.bounds.Intersects(bossCollider.bounds)
+        )
+        {
+            yield return null;
+        }
+
+        if (
+            ignoredPlayerCollider == playerCollider &&
+            playerCollider != null &&
+            bossCollider != null
+        )
+        {
+            Physics2D.IgnoreCollision(
+                playerCollider,
+                bossCollider,
+                false
+            );
+            ignoredPlayerCollider = null;
+        }
+
+        playerPassThroughRoutine = null;
+    }
+
+
+private void BeginPlayerPassThrough(
+        Collider2D playerCollider
+    )
+    {
+        if (playerCollider == null || bossCollider == null)
+        {
+            return;
+        }
+
+        RestoreIgnoredPlayerCollision();
+        ignoredPlayerCollider = playerCollider;
+        Physics2D.IgnoreCollision(
+            ignoredPlayerCollider,
+            bossCollider,
+            true
+        );
+        playerPassThroughRoutine = StartCoroutine(
+            RestorePlayerCollisionAfterInvulnerability(playerCollider)
+        );
     }
 }

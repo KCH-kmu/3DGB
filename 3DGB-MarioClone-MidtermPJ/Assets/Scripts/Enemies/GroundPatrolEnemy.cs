@@ -7,12 +7,26 @@ public class GroundPatrolEnemy : EnemyBase
     [SerializeField] private float movementRange = 2.5f;
 
     private float initialX;
-    private int moveDirection = -1;
+    
+    private bool sourceFacesLeft;
+    private bool directionIndependentVisual;
+private int moveDirection = -1;
 
-    protected override void Awake()
+protected override void Awake()
     {
         base.Awake();
         initialX = transform.position.x;
+
+        string spriteName =
+            EnemySprite != null && EnemySprite.sprite != null
+                ? EnemySprite.sprite.name
+                : string.Empty;
+
+        sourceFacesLeft = spriteName == "Enemies_025";
+        directionIndependentVisual =
+            spriteName == "Enemies_052" ||
+            spriteName == "Enemies_056";
+
         UpdateDirectionVisual();
     }
 
@@ -69,8 +83,22 @@ public class GroundPatrolEnemy : EnemyBase
         UpdateDirectionVisual();
     }
 
-    private void UpdateDirectionVisual()
+private void UpdateDirectionVisual()
     {
-        EnemySprite.flipX = moveDirection > 0;
+        if (EnemySprite == null)
+        {
+            return;
+        }
+
+        if (directionIndependentVisual)
+        {
+            EnemySprite.flipX = false;
+            return;
+        }
+
+        bool movingRight = moveDirection > 0;
+        EnemySprite.flipX = sourceFacesLeft
+            ? movingRight
+            : !movingRight;
     }
 }

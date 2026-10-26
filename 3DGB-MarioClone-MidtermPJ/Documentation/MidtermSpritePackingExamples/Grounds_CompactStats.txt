@@ -1,8 +1,0 @@
-Atlas: Grounds.png
-Sprites: 116
-Before: 2048x1024 (2,097,152 pixels)
-After: 1752x792 (1,387,584 pixels)
-Area reduction: 33.83%
-Rectangle fill before: 52.52%
-Rectangle fill after: 79.38%
-Gutter: 8px

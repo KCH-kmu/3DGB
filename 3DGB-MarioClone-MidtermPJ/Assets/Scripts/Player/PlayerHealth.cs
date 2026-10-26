@@ -25,6 +25,8 @@ public class PlayerHealth : MonoBehaviour
     private PlayerPowerUp playerPowerUp;
     private Collider2D[] playerColliders;
     private MonoBehaviour[] playerBehaviours;
+    private SpriteRenderer[] playerRenderers;
+    private Color[] playerRendererBaseColors;
     private Coroutine damageCooldownRoutine;
     private FallRespawnZone fallRespawnZone;
     private PlayerMovement playerMovement;
@@ -43,6 +45,14 @@ public class PlayerHealth : MonoBehaviour
         playerMovement = GetComponent<PlayerMovement>();
         playerColliders = GetComponentsInChildren<Collider2D>(true);
         playerBehaviours = GetComponents<MonoBehaviour>();
+        playerRenderers = GetComponentsInChildren<SpriteRenderer>(true);
+        playerRendererBaseColors = new Color[playerRenderers.Length];
+
+        for (int index = 0; index < playerRenderers.Length; index++)
+        {
+            playerRendererBaseColors[index] =
+                playerRenderers[index].color;
+        }
 
         audioSource = GetComponent<AudioSource>();
 
@@ -215,20 +225,43 @@ public class PlayerHealth : MonoBehaviour
         }
     }
 
-    private void BeginDamageCooldown()
+private void BeginDamageCooldown()
     {
         if (damageCooldownRoutine != null)
         {
             StopCoroutine(damageCooldownRoutine);
+            damageCooldownRoutine = null;
+            RestorePlayerRendererColors();
         }
 
         damageCooldownRoutine = StartCoroutine(DamageCooldown());
     }
 
-    private IEnumerator DamageCooldown()
+private IEnumerator DamageCooldown()
     {
         canTakeDamage = false;
-        yield return new WaitForSeconds(invulnerabilityTime);
+
+        const float blinkInterval = 0.09f;
+        const float fadedAlphaMultiplier = 0.28f;
+        float invulnerabilityEndTime =
+            Time.time + invulnerabilityTime;
+        bool showFadedFrame = true;
+
+        while (!hasEnded && Time.time < invulnerabilityEndTime)
+        {
+            SetPlayerRendererAlpha(
+                showFadedFrame ? fadedAlphaMultiplier : 1f
+            );
+            showFadedFrame = !showFadedFrame;
+
+            float remainingTime =
+                invulnerabilityEndTime - Time.time;
+            yield return new WaitForSeconds(
+                Mathf.Min(blinkInterval, remainingTime)
+            );
+        }
+
+        RestorePlayerRendererColors();
 
         if (!hasEnded)
         {
@@ -236,6 +269,55 @@ public class PlayerHealth : MonoBehaviour
         }
 
         damageCooldownRoutine = null;
+    }
+
+    private void SetPlayerRendererAlpha(float alphaMultiplier)
+    {
+        if (
+            playerRenderers == null ||
+            playerRendererBaseColors == null
+        )
+        {
+            return;
+        }
+
+        for (int index = 0; index < playerRenderers.Length; index++)
+        {
+            SpriteRenderer playerRenderer = playerRenderers[index];
+
+            if (playerRenderer == null)
+            {
+                continue;
+            }
+
+            Color baseColor = playerRendererBaseColors[index];
+            playerRenderer.color = new Color(
+                baseColor.r,
+                baseColor.g,
+                baseColor.b,
+                baseColor.a * alphaMultiplier
+            );
+        }
+    }
+
+    private void RestorePlayerRendererColors()
+    {
+        if (
+            playerRenderers == null ||
+            playerRendererBaseColors == null
+        )
+        {
+            return;
+        }
+
+        for (int index = 0; index < playerRenderers.Length; index++)
+        {
+            if (playerRenderers[index] != null)
+            {
+                playerRenderers[index].color =
+                    playerRendererBaseColors[index];
+            }
+        }
     }
 
     private void Die()

@@ -1,8 +1,0 @@
-Atlas: Pickups.png
-Sprites: 107
-Before: 2048x1024 (2,097,152 pixels)
-After: 1368x664 (908,352 pixels)
-Area reduction: 56.69%
-Rectangle fill before: 34.02%
-Rectangle fill after: 78.54%
-Gutter: 8px

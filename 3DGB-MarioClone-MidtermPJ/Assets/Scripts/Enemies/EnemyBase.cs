@@ -22,10 +22,28 @@ public abstract class EnemyBase : MonoBehaviour
 
     private const float StompHeightTolerance = 0.15f;
 
-    protected virtual void Awake()
+protected virtual void Awake()
     {
         MyBody = GetComponent<Rigidbody2D>();
-        EnemySprite = GetComponent<SpriteRenderer>();
+
+        SpriteRenderer rootRenderer = GetComponent<SpriteRenderer>();
+        EnemySprite = rootRenderer;
+
+        if (rootRenderer == null || !rootRenderer.enabled)
+        {
+            SpriteRenderer[] renderers =
+                GetComponentsInChildren<SpriteRenderer>(true);
+
+            foreach (SpriteRenderer renderer in renderers)
+            {
+                if (renderer != rootRenderer && renderer.enabled)
+                {
+                    EnemySprite = renderer;
+                    break;
+                }
+            }
+        }
+
         EnemyAnimator = GetComponent<Animator>();
         EnemyCollider = GetComponent<Collider2D>();
     }

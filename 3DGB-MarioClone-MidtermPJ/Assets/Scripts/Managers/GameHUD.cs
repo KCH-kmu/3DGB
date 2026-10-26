@@ -1,15 +1,15 @@
 using UnityEngine;
-using UnityEngine.UI;
+using TMPro;
 
 public class GameHUD : MonoBehaviour
 {
-    [SerializeField] private Text scoreText;
-    [SerializeField] private Text livesText;
-    [SerializeField] private Text coinsText;
-    [SerializeField] private Text timerText;
-    [SerializeField] private Text bossHealthText;
+    [SerializeField] private TMP_Text scoreText;
+    [SerializeField] private TMP_Text livesText;
+    [SerializeField] private TMP_Text coinsText;
+    [SerializeField] private TMP_Text timerText;
+    [SerializeField] private TMP_Text bossHealthText;
     [SerializeField] private GameObject messagePanel;
-    [SerializeField] private Text messageText;
+    [SerializeField] private TMP_Text messageText;
     [SerializeField] private PlayerHealth playerHealth;
     [SerializeField, Min(1f)] private float startingTime = 180f;
     [SerializeField, Min(0)] private int coinScoreValue = 100;
@@ -26,10 +26,10 @@ public class GameHUD : MonoBehaviour
     public float TimeRemaining => timeRemaining;
 
     public void Configure(
-        Text score,
-        Text lives,
+        TMP_Text score,
+        TMP_Text lives,
         GameObject panel,
-        Text message,
+        TMP_Text message,
         PlayerHealth health
     )
     {
@@ -41,12 +41,12 @@ public class GameHUD : MonoBehaviour
     }
 
     public void Configure(
-        Text scoreDisplay,
-        Text livesDisplay,
-        Text coinsDisplay,
-        Text timerDisplay,
+        TMP_Text scoreDisplay,
+        TMP_Text livesDisplay,
+        TMP_Text coinsDisplay,
+        TMP_Text timerDisplay,
         GameObject panel,
-        Text message,
+        TMP_Text message,
         PlayerHealth health,
         float timerSeconds = 180f
     )
@@ -145,7 +145,7 @@ public class GameHUD : MonoBehaviour
         UpdateScoreText();
     }
 
-    public void ConfigureBossHealth(Text display)
+    public void ConfigureBossHealth(TMP_Text display)
     {
         bossHealthText = display;
 

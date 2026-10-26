@@ -5,11 +5,25 @@ public class GameHUD : MonoBehaviour
 {
     [SerializeField] private Text scoreText;
     [SerializeField] private Text livesText;
+    [SerializeField] private Text coinsText;
+    [SerializeField] private Text timerText;
+    [SerializeField] private Text bossHealthText;
     [SerializeField] private GameObject messagePanel;
     [SerializeField] private Text messageText;
     [SerializeField] private PlayerHealth playerHealth;
+    [SerializeField, Min(1f)] private float startingTime = 180f;
+    [SerializeField, Min(0)] private int coinScoreValue = 100;
 
     private int coinCount;
+    private int score;
+    private float timeRemaining;
+    private int displayedSecond = -1;
+    private bool timerStopped;
+    private bool timeExpired;
+
+    public int CoinCount => coinCount;
+    public int Score => score;
+    public float TimeRemaining => timeRemaining;
 
     public void Configure(
         Text score,
@@ -24,6 +38,27 @@ public class GameHUD : MonoBehaviour
         messagePanel = panel;
         messageText = message;
         playerHealth = health;
+    }
+
+    public void Configure(
+        Text scoreDisplay,
+        Text livesDisplay,
+        Text coinsDisplay,
+        Text timerDisplay,
+        GameObject panel,
+        Text message,
+        PlayerHealth health,
+        float timerSeconds = 180f
+    )
+    {
+        scoreText = scoreDisplay;
+        livesText = livesDisplay;
+        coinsText = coinsDisplay;
+        timerText = timerDisplay;
+        messagePanel = panel;
+        messageText = message;
+        playerHealth = health;
+        startingTime = Mathf.Max(1f, timerSeconds);
     }
 
     private void OnEnable()
@@ -41,7 +76,10 @@ public class GameHUD : MonoBehaviour
 
     private void Start()
     {
+        timeRemaining = startingTime;
+        UpdateCoinText();
         UpdateScoreText();
+        UpdateTimerText(true);
 
         if (playerHealth != null)
         {
@@ -52,6 +90,32 @@ public class GameHUD : MonoBehaviour
         {
             messagePanel.SetActive(false);
         }
+    }
+
+    private void Update()
+    {
+        if (timerStopped)
+        {
+            return;
+        }
+
+        timeRemaining = Mathf.Max(0f, timeRemaining - Time.deltaTime);
+        UpdateTimerText(false);
+
+        if (timeRemaining > 0f)
+        {
+            return;
+        }
+
+        timerStopped = true;
+        timeExpired = true;
+
+        if (playerHealth != null)
+        {
+            playerHealth.TimeExpired();
+        }
+
+        ShowMessage("TIME UP\nPRESS R TO RESTART");
     }
 
     private void OnDisable()
@@ -65,12 +129,60 @@ public class GameHUD : MonoBehaviour
     public void AddCoin()
     {
         coinCount++;
+        score += coinScoreValue;
+        UpdateCoinText();
         UpdateScoreText();
+    }
+
+    public void AddScore(int amount)
+    {
+        if (amount <= 0)
+        {
+            return;
+        }
+
+        score += amount;
+        UpdateScoreText();
+    }
+
+    public void ConfigureBossHealth(Text display)
+    {
+        bossHealthText = display;
+
+        if (bossHealthText != null)
+        {
+            bossHealthText.gameObject.SetActive(false);
+        }
+    }
+
+    public void ShowBossHealth(int current, int maximum)
+    {
+        if (bossHealthText == null)
+        {
+            return;
+        }
+
+        bossHealthText.gameObject.SetActive(true);
+        bossHealthText.text =
+            "BOSS  " + Mathf.Max(0, current) + " / " + Mathf.Max(1, maximum);
+    }
+
+    public void ShowBossVictory()
+    {
+        timerStopped = true;
+
+        if (bossHealthText != null)
+        {
+            bossHealthText.gameObject.SetActive(false);
+        }
+
+        ShowMessage("BOSS DEFEATED!\nENTER: NEXT LEVEL");
     }
 
     public void ShowLevelComplete()
     {
-        ShowMessage("LEVEL COMPLETE!\nPRESS R TO RESTART");
+        timerStopped = true;
+        ShowMessage("LEVEL COMPLETE!\nENTER: NEXT LEVEL");
     }
 
     private void OnLivesChanged(int lives)
@@ -82,7 +194,12 @@ public class GameHUD : MonoBehaviour
 
         if (lives <= 0)
         {
-            ShowMessage("GAME OVER\nPRESS R TO RESTART");
+            timerStopped = true;
+
+            if (!timeExpired)
+            {
+                ShowMessage("GAME OVER\nPRESS R TO RESTART");
+            }
         }
     }
 
@@ -90,7 +207,32 @@ public class GameHUD : MonoBehaviour
     {
         if (scoreText != null)
         {
-            scoreText.text = coinCount.ToString();
+            scoreText.text = "SCORE  " + score.ToString("D6");
+        }
+    }
+
+    private void UpdateCoinText()
+    {
+        if (coinsText != null)
+        {
+            coinsText.text = coinCount.ToString("D2");
+        }
+    }
+
+    private void UpdateTimerText(bool force)
+    {
+        int seconds = Mathf.CeilToInt(timeRemaining);
+
+        if (!force && seconds == displayedSecond)
+        {
+            return;
+        }
+
+        displayedSecond = seconds;
+
+        if (timerText != null)
+        {
+            timerText.text = "TIME  " + seconds.ToString("D3");
         }
     }
 

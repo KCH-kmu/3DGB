@@ -6,6 +6,8 @@ public class PlayerMovement : MonoBehaviour
     [SerializeField] private float speed = 5f;
     [SerializeField] private float jumpForce = 14f;
     [SerializeField] private float groundCheckRadius = 0.12f;
+    [SerializeField, Min(0.1f)] private float groundCheckWidth = 0.52f;
+    [SerializeField, Min(0f)] private float groundedGraceTime = 0.08f;
 
     [Header("Sound")]
     [SerializeField] private AudioClip jumpSound;
@@ -18,6 +20,7 @@ public class PlayerMovement : MonoBehaviour
     private int groundLayerMask;
 
     private bool isGrounded;
+    private float lastGroundedTime = float.NegativeInfinity;
     private readonly HashSet<Collider2D> groundContacts =
         new HashSet<Collider2D>();
 
@@ -54,7 +57,7 @@ public class PlayerMovement : MonoBehaviour
     {
         if (groundCheck == null)
         {
-            SetGrounded(groundContacts.Count > 0);
+            UpdateGroundedStateWithGrace(groundContacts.Count > 0);
             return;
         }
 
@@ -65,15 +68,33 @@ public class PlayerMovement : MonoBehaviour
             return;
         }
 
-        bool overlapsGround = Physics2D.OverlapCircle(
+        bool overlapsGround = Physics2D.OverlapBox(
             groundCheck.position,
-            groundCheckRadius,
+            new Vector2(groundCheckWidth, groundCheckRadius * 2f),
+            0f,
             groundLayerMask
         ) != null;
 
-        // 타일 경계를 건너는 한 프레임 동안 Trigger Exit가 먼저 발생해도
-        // 물리 조회 결과로 접지 상태가 끊기지 않도록 한다.
-        SetGrounded(overlapsGround || groundContacts.Count > 0);
+        UpdateGroundedStateWithGrace(
+            overlapsGround || groundContacts.Count > 0
+        );
+    }
+
+    private void UpdateGroundedStateWithGrace(bool hasGroundContact)
+    {
+        if (hasGroundContact)
+        {
+            lastGroundedTime = Time.time;
+            SetGrounded(true);
+            return;
+        }
+
+        // 타일 경계에서 접촉 콜백 순서가 바뀌는 한두 프레임은
+        // 접지 상태를 유지해 걷는 중 점프 모션이 깜빡이지 않게 한다.
+        if (Time.time - lastGroundedTime > groundedGraceTime)
+        {
+            SetGrounded(false);
+        }
     }
 
     private void PlayerWalk()
@@ -126,6 +147,7 @@ public class PlayerMovement : MonoBehaviour
             LayerMask.NameToLayer("Ground"))
         {
             groundContacts.Add(collision);
+            lastGroundedTime = Time.time;
             SetGrounded(true);
         }
     }

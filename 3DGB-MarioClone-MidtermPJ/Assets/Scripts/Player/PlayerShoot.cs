@@ -5,17 +5,28 @@ public class PlayerShoot : MonoBehaviour
     public GameObject fireBullet;
 
     [SerializeField] private KeyCode shootKey = KeyCode.X;
+    [SerializeField, Min(0f)] private float shotCooldown = 0.25f;
 
     [Header("Sound")]
     [SerializeField] private AudioClip shootSound;
 
     private SpriteRenderer spriteRenderer;
     private AudioSource audioSource;
+    private PlayerPowerUp powerUp;
+    private float nextShotTime;
+
+    public bool CanShoot => powerUp != null && powerUp.IsPoweredUp;
 
     private void Awake()
     {
         spriteRenderer = GetComponent<SpriteRenderer>();
         audioSource = GetComponent<AudioSource>();
+        powerUp = GetComponent<PlayerPowerUp>();
+
+        if (powerUp == null)
+        {
+            powerUp = gameObject.AddComponent<PlayerPowerUp>();
+        }
 
         if (audioSource == null)
         {
@@ -28,7 +39,11 @@ public class PlayerShoot : MonoBehaviour
 
     private void Update()
     {
-        if (Input.GetKeyDown(shootKey))
+        if (
+            CanShoot &&
+            Input.GetKeyDown(shootKey) &&
+            Time.time >= nextShotTime
+        )
         {
             ShootBullet();
         }
@@ -42,9 +57,13 @@ public class PlayerShoot : MonoBehaviour
             return;
         }
 
+        float direction = spriteRenderer.flipX ? -1f : 1f;
+        Vector3 spawnPosition = transform.position +
+            Vector3.right * direction * 0.65f;
+
         GameObject bullet = Instantiate(
             fireBullet,
-            transform.position,
+            spawnPosition,
             Quaternion.identity
         );
 
@@ -58,9 +77,9 @@ public class PlayerShoot : MonoBehaviour
         }
 
         // 현재 PlayerMovement는 localScale 대신 SpriteRenderer.flipX를 사용한다.
-        float direction = spriteRenderer.flipX ? -1f : 1f;
         bulletMovement.Speed =
             Mathf.Abs(bulletMovement.Speed) * direction;
+        nextShotTime = Time.time + shotCooldown;
 
         if (shootSound != null)
         {

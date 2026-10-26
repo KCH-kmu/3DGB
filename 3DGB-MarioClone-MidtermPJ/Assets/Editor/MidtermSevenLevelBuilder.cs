@@ -6,6 +6,7 @@ using UnityEditor;
 using UnityEditor.SceneManagement;
 using UnityEngine;
 using UnityEngine.SceneManagement;
+using UnityEngine.UI;
 
 public static class MidtermSevenLevelBuilder
 {
@@ -16,6 +17,12 @@ public static class MidtermSevenLevelBuilder
     private const float FloorY = -3.2f;
     private const float PlayerStartX = -7f;
     private const float LevelEndX = 108f;
+    private const float MaximumGapReduction = 1.2f;
+    private const float MinimumJumpGap = 2.4f;
+    private const float PoweredPassageClearance = 2.1f;
+    private const float CoinBlockClearance = 0.25f;
+    private const float GroundVisualOverlap = 0.03f;
+    private const float EnemyColliderFootInset = 0.04f;
 
     private static readonly string[] LevelNames =
     {
@@ -90,6 +97,7 @@ public static class MidtermSevenLevelBuilder
         public string PlatformAtlas = "Grounds";
         public string PlatformSprite = "Grounds_053";
         public float PlatformScale = 1f;
+        public float PlatformWidthScale = 1f;
         public Color CameraColor;
         public readonly List<Segment> Segments = new List<Segment>();
         public readonly List<PlatformSpec> Platforms =
@@ -166,6 +174,1130 @@ public static class MidtermSevenLevelBuilder
         Debug.Log("Seven midterm level scenes were built successfully.");
     }
 
+    [MenuItem("Tools/Codex/Apply Checkpoints To Existing Levels")]
+    public static void ApplyCheckpointsToExistingLevels()
+    {
+        string originalScenePath = SceneManager.GetActiveScene().path;
+
+        for (int levelIndex = 0; levelIndex < 7; levelIndex++)
+        {
+            LevelPlan plan = CreatePlan(levelIndex + 1);
+            string levelPath = GetLevelPath(plan.Number);
+
+            if (AssetDatabase.LoadAssetAtPath<SceneAsset>(levelPath) == null)
+            {
+                throw new InvalidOperationException(
+                    "The level scene was not found: " + levelPath
+                );
+            }
+
+            Scene scene = EditorSceneManager.OpenScene(
+                levelPath,
+                OpenSceneMode.Single
+            );
+            GameObject checkpointObject =
+                GameObject.Find("Checkpoint_Placement");
+
+            if (checkpointObject == null)
+            {
+                throw new InvalidOperationException(
+                    "Checkpoint_Placement was not found in " + levelPath
+                );
+            }
+
+            float checkpointGround =
+                FindGroundTop(plan, plan.CheckpointX);
+            ConfigureCheckpointObject(
+                checkpointObject,
+                plan,
+                checkpointGround
+            );
+
+            EditorSceneManager.MarkSceneDirty(scene);
+            EditorSceneManager.SaveScene(scene);
+        }
+
+        if (!string.IsNullOrEmpty(originalScenePath))
+        {
+            EditorSceneManager.OpenScene(
+                originalScenePath,
+                OpenSceneMode.Single
+            );
+        }
+
+        AssetDatabase.SaveAssets();
+        AssetDatabase.Refresh();
+        Debug.Log("Checkpoints were applied to all seven level scenes.");
+    }
+
+    [MenuItem("Tools/Codex/Apply Required HUD Bird AI And Respawn")]
+    public static void ApplyRequiredSystemsToExistingLevels()
+    {
+        string originalScenePath = SceneManager.GetActiveScene().path;
+
+        for (int levelIndex = 0; levelIndex < 7; levelIndex++)
+        {
+            LevelPlan plan = CreatePlan(levelIndex + 1);
+            string levelPath = GetLevelPath(plan.Number);
+
+            if (AssetDatabase.LoadAssetAtPath<SceneAsset>(levelPath) == null)
+            {
+                throw new InvalidOperationException(
+                    "The level scene was not found: " + levelPath
+                );
+            }
+
+            Scene scene = EditorSceneManager.OpenScene(
+                levelPath,
+                OpenSceneMode.Single
+            );
+            GameObject levelRoot = GameObject.Find(
+                "Level" + plan.Number + "_Generated"
+            );
+            GameObject checkpointObject = GameObject.Find(
+                "Checkpoint_Placement"
+            );
+            GameObject obstacleRoot = GameObject.Find(
+                "Obstacles_" + plan.DisplayName
+            );
+
+            if (
+                levelRoot == null ||
+                checkpointObject == null ||
+                obstacleRoot == null
+            )
+            {
+                throw new InvalidOperationException(
+                    "Required generated objects were not found in " + levelPath
+                );
+            }
+
+            ConfigureRequiredHud(levelRoot, plan.Number);
+            ConfigureExistingBoss(levelRoot, plan);
+            RemoveUnnecessaryLevel3Structures(levelRoot, plan);
+            RebuildExistingSpikeHazards(
+                plan,
+                obstacleRoot.transform
+            );
+            ConfigureBirdAttacks();
+            ConfigureEnemyStompRules();
+            ConfigureCheckpointObject(
+                checkpointObject,
+                plan,
+                FindGroundTop(plan, plan.CheckpointX)
+            );
+            ValidateRequiredSystems(levelRoot, plan);
+
+            EditorSceneManager.MarkSceneDirty(scene);
+            EditorSceneManager.SaveScene(scene);
+        }
+
+        if (!string.IsNullOrEmpty(originalScenePath))
+        {
+            EditorSceneManager.OpenScene(
+                originalScenePath,
+                OpenSceneMode.Single
+            );
+        }
+
+        AssetDatabase.SaveAssets();
+        AssetDatabase.Refresh();
+        Debug.Log(
+            "Required HUD, bird AI, boss battle, spike hazards, " +
+            "checkpoints, and respawn systems were applied to all seven levels."
+        );
+    }
+
+    [MenuItem("Tools/Codex/Polish Existing Level Traversal")]
+    public static void PolishExistingLevelTraversal()
+    {
+        string originalScenePath = SceneManager.GetActiveScene().path;
+
+        for (int levelIndex = 0; levelIndex < 7; levelIndex++)
+        {
+            LevelPlan plan = CreatePlan(levelIndex + 1);
+            string levelPath = GetLevelPath(plan.Number);
+
+            if (AssetDatabase.LoadAssetAtPath<SceneAsset>(levelPath) == null)
+            {
+                throw new InvalidOperationException(
+                    "The level scene was not found: " + levelPath
+                );
+            }
+
+            Scene scene = EditorSceneManager.OpenScene(
+                levelPath,
+                OpenSceneMode.Single
+            );
+            GameObject terrainRoot =
+                GameObject.Find("Terrain_" + plan.DisplayName);
+            GameObject obstacleRoot =
+                GameObject.Find("Obstacles_" + plan.DisplayName);
+            GameObject enemyRoot =
+                GameObject.Find("Enemies_" + plan.DisplayName);
+            GameObject progressionRoot =
+                GameObject.Find("Progression_" + plan.DisplayName);
+
+            if (
+                terrainRoot == null ||
+                obstacleRoot == null ||
+                enemyRoot == null ||
+                progressionRoot == null
+            )
+            {
+                throw new InvalidOperationException(
+                    "Generated level roots were not found in " + levelPath
+                );
+            }
+
+            DisableGeneratedThemeDecorations(obstacleRoot.transform);
+            ApplyPoweredTerrainClearance(
+                plan,
+                terrainRoot.transform,
+                obstacleRoot.transform
+            );
+            ExtendGroundForComfort(plan, terrainRoot.transform);
+            Transform[] groundedRoots =
+            {
+                obstacleRoot.transform,
+                enemyRoot.transform,
+                progressionRoot.transform
+            };
+            AlignKnownGroundedObjects(plan, groundedRoots);
+            ConfigureExistingPlatformColliders(
+                plan,
+                obstacleRoot.transform
+            );
+            ConfigureExistingBridgeColliders(obstacleRoot.transform);
+            ApplyPoweredPassageClearance(plan, obstacleRoot.transform);
+            Physics2D.SyncTransforms();
+            ValidatePoweredTerrainClearance(
+                plan,
+                terrainRoot.transform
+            );
+            ValidatePoweredPassageClearance(
+                plan,
+                terrainRoot.transform,
+                obstacleRoot.transform
+            );
+            ValidateGroundedObjectAlignment(plan, groundedRoots);
+            ValidatePlatformColliders(plan, obstacleRoot.transform);
+
+            EditorSceneManager.MarkSceneDirty(scene);
+            EditorSceneManager.SaveScene(scene);
+        }
+
+        if (!string.IsNullOrEmpty(originalScenePath))
+        {
+            EditorSceneManager.OpenScene(
+                originalScenePath,
+                OpenSceneMode.Single
+            );
+        }
+
+        AssetDatabase.SaveAssets();
+        AssetDatabase.Refresh();
+        Debug.Log(
+            "All seven levels were polished for traversal and clearance."
+        );
+    }
+
+    private static void DisableGeneratedThemeDecorations(
+        Transform obstacleRoot
+    )
+    {
+        foreach (
+            Transform child in
+            obstacleRoot.GetComponentsInChildren<Transform>(true)
+        )
+        {
+            if (
+                child != obstacleRoot &&
+                child.name.StartsWith(
+                    "Theme_Decoration_",
+                    StringComparison.Ordinal
+                ) &&
+                child.gameObject.activeSelf
+            )
+            {
+                child.gameObject.SetActive(false);
+                EditorUtility.SetDirty(child.gameObject);
+            }
+        }
+    }
+
+    private static void ExtendGroundForComfort(
+        LevelPlan plan,
+        Transform terrainRoot
+    )
+    {
+        int primarySegmentCount = GetPrimarySegmentCount(plan);
+
+        for (int index = 0; index < primarySegmentCount; index++)
+        {
+            GameObject groundGroup = FindChild(
+                terrainRoot,
+                "Ground_" + (index + 1)
+            );
+
+            if (groundGroup == null)
+            {
+                continue;
+            }
+
+            ExtendGroundGroupToSegment(
+                groundGroup,
+                plan.Segments[index]
+            );
+        }
+    }
+
+    private static void ExtendGroundGroupToSegment(
+        GameObject groundGroup,
+        Segment segment
+    )
+    {
+        SetTraversalExtensionsActive(groundGroup.transform, false);
+
+        SpriteRenderer sampleRenderer = groundGroup
+            .GetComponentsInChildren<SpriteRenderer>()
+            .FirstOrDefault(item => !item.name.StartsWith(
+                "Traversal_Extension_",
+                StringComparison.Ordinal
+            ));
+
+        if (sampleRenderer == null || sampleRenderer.sprite == null)
+        {
+            return;
+        }
+
+        BoxCollider2D[] colliders =
+            groundGroup.GetComponentsInChildren<BoxCollider2D>()
+                .Where(item => !item.name.StartsWith(
+                    "Traversal_Extension_",
+                    StringComparison.Ordinal
+                ))
+                .ToArray();
+
+        if (colliders.Length == 0)
+        {
+            return;
+        }
+
+        float currentMin = colliders.Min(item => item.bounds.min.x);
+        float currentMax = colliders.Max(item => item.bounds.max.x);
+
+        float colliderWidth = sampleRenderer.sprite.bounds.size.x * 0.96f;
+        float minimumUsefulExtension = colliderWidth * 0.45f;
+
+        if (currentMin - segment.Start >= minimumUsefulExtension)
+        {
+            CreateGroundExtension(
+                groundGroup.transform,
+                sampleRenderer,
+                "Traversal_Extension_Left",
+                segment.Start,
+                currentMin,
+                segment.Top
+            );
+        }
+
+        if (segment.End - currentMax >= minimumUsefulExtension)
+        {
+            CreateGroundExtension(
+                groundGroup.transform,
+                sampleRenderer,
+                "Traversal_Extension_Right",
+                currentMax,
+                segment.End,
+                segment.Top
+            );
+        }
+    }
+
+    private static void SetTraversalExtensionsActive(
+        Transform groundGroup,
+        bool active
+    )
+    {
+        foreach (
+            Transform child in
+            groundGroup.GetComponentsInChildren<Transform>(true)
+        )
+        {
+            if (
+                child != groundGroup &&
+                child.name.StartsWith(
+                    "Traversal_Extension_",
+                    StringComparison.Ordinal
+                )
+            )
+            {
+                child.gameObject.SetActive(active);
+                EditorUtility.SetDirty(child.gameObject);
+            }
+        }
+    }
+
+    private static void CreateGroundExtension(
+        Transform parent,
+        SpriteRenderer sampleRenderer,
+        string name,
+        float start,
+        float end,
+        float top
+    )
+    {
+        float requestedWidth = end - start;
+
+        if (requestedWidth <= 0.02f)
+        {
+            return;
+        }
+
+        GameObject extension = FindChild(parent, name);
+
+        if (extension == null)
+        {
+            extension = new GameObject(name);
+            extension.transform.SetParent(parent);
+            extension.layer = LayerMask.NameToLayer("Ground");
+            extension.AddComponent<SpriteRenderer>();
+            extension.AddComponent<BoxCollider2D>();
+        }
+
+        Sprite sprite = sampleRenderer.sprite;
+        float colliderWidth = sprite.bounds.size.x * 0.96f;
+        bool extendsLeft = name.EndsWith(
+            "Left",
+            StringComparison.Ordinal
+        );
+        SpriteRenderer renderer = extension.GetComponent<SpriteRenderer>();
+        extension.SetActive(true);
+        extension.layer = LayerMask.NameToLayer("Ground");
+        renderer.sprite = sprite;
+        renderer.color = sampleRenderer.color;
+        renderer.sharedMaterial = sampleRenderer.sharedMaterial;
+        renderer.sortingLayerID = sampleRenderer.sortingLayerID;
+        renderer.sortingOrder = sampleRenderer.sortingOrder;
+        renderer.flipX = sampleRenderer.flipX;
+        renderer.flipY = sampleRenderer.flipY;
+        renderer.drawMode = SpriteDrawMode.Simple;
+
+        extension.transform.position = new Vector3(
+            extendsLeft
+                ? end - colliderWidth * 0.5f
+                : start + colliderWidth * 0.5f,
+            top - sprite.bounds.size.y * 0.5f,
+            sampleRenderer.transform.position.z
+        );
+        extension.transform.localScale = Vector3.one;
+
+        BoxCollider2D collider = extension.GetComponent<BoxCollider2D>();
+        collider.size = new Vector2(
+            colliderWidth,
+            sprite.bounds.size.y
+        );
+        collider.offset = Vector2.zero;
+
+        EditorUtility.SetDirty(extension);
+        EditorUtility.SetDirty(renderer);
+        EditorUtility.SetDirty(collider);
+    }
+
+    private static void ApplyPoweredTerrainClearance(
+        LevelPlan plan,
+        Transform terrainRoot,
+        Transform obstacleRoot
+    )
+    {
+        int primarySegmentCount = GetPrimarySegmentCount(plan);
+
+        for (
+            int index = primarySegmentCount;
+            index < plan.Segments.Count;
+            index++
+        )
+        {
+            GameObject groundGroup = FindChild(
+                terrainRoot,
+                "Ground_" + (index + 1)
+            );
+
+            if (groundGroup == null)
+            {
+                continue;
+            }
+
+            BoxCollider2D[] colliders = groundGroup
+                .GetComponentsInChildren<BoxCollider2D>();
+
+            if (colliders.Length == 0)
+            {
+                continue;
+            }
+
+            float currentTop = colliders.Max(item => item.bounds.max.y);
+            float deltaY = plan.Segments[index].Top - currentTop;
+
+            if (Mathf.Abs(deltaY) <= 0.01f)
+            {
+                continue;
+            }
+
+            ShiftObjectsAttachedToRaisedTerrain(
+                obstacleRoot,
+                plan.Segments[index],
+                currentTop,
+                deltaY
+            );
+            groundGroup.transform.position += Vector3.up * deltaY;
+            EditorUtility.SetDirty(groundGroup.transform);
+        }
+    }
+
+    private static void ShiftObjectsAttachedToRaisedTerrain(
+        Transform obstacleRoot,
+        Segment segment,
+        float currentTop,
+        float deltaY
+    )
+    {
+        foreach (Transform child in obstacleRoot)
+        {
+            string objectName = child.name;
+
+            if (
+                objectName.StartsWith("Hazard_", StringComparison.Ordinal) ||
+                objectName.StartsWith("Theme_", StringComparison.Ordinal) ||
+                objectName.Contains("Bird") ||
+                objectName.Contains("Bridge") ||
+                objectName.Contains("Rope") ||
+                objectName.Contains("Mace") ||
+                objectName.Contains("Splash")
+            )
+            {
+                continue;
+            }
+
+            float x = child.position.x;
+
+            if (
+                x < segment.Start - 0.05f ||
+                x > segment.End + 0.05f ||
+                child.position.y < currentTop - 0.25f
+            )
+            {
+                continue;
+            }
+
+            child.position += Vector3.up * deltaY;
+            EditorUtility.SetDirty(child);
+        }
+    }
+
+    private static void AlignKnownGroundedObjects(
+        LevelPlan plan,
+        params Transform[] roots
+    )
+    {
+        foreach (Transform root in roots)
+        {
+            if (root == null)
+            {
+                continue;
+            }
+
+            foreach (Transform child in root)
+            {
+                string objectName = child.name;
+                bool isGroundedEnemy = IsGroundedEnemy(objectName);
+
+                if (!IsKnownGroundedObject(objectName))
+                {
+                    continue;
+                }
+
+                SpriteRenderer renderer =
+                    child.GetComponentInChildren<SpriteRenderer>();
+
+                if (renderer == null || renderer.sprite == null)
+                {
+                    continue;
+                }
+
+                if (isGroundedEnemy)
+                {
+                    ConfigureGroundedEnemyCollider(
+                        child.gameObject,
+                        renderer
+                    );
+                }
+
+                float groundTop = FindGroundTop(plan, child.position.x);
+                float targetBottom = groundTop - GroundVisualOverlap;
+                float deltaY = targetBottom - renderer.bounds.min.y;
+
+                if (Mathf.Abs(deltaY) <= 0.005f)
+                {
+                    continue;
+                }
+
+                child.position += Vector3.up * deltaY;
+                EditorUtility.SetDirty(child);
+            }
+        }
+    }
+
+    private static bool IsGroundedEnemy(string objectName)
+    {
+        return
+            objectName.StartsWith("Enemy_", StringComparison.Ordinal) &&
+            !objectName.Contains("Bird");
+    }
+
+    private static bool IsKnownGroundedObject(string objectName)
+    {
+        if (
+            objectName == "Spring" ||
+            objectName == "FireFlower_PowerUp_Placement" ||
+            objectName == "Checkpoint_Placement" ||
+            objectName == "LockedDoor_Placement" ||
+            objectName == "Boss_Placement" ||
+            objectName == "Level_Goal" ||
+            objectName == "Start_Sign" ||
+            objectName == "GreenFields_Tree" ||
+            objectName == "Goal_Arrow" ||
+            objectName == "Cave_Crystal_A" ||
+            objectName == "Cave_Crystal_B" ||
+            objectName == "Cave_Torch" ||
+            objectName == "Snow_Scenery" ||
+            objectName == "Ruins_Column_A" ||
+            objectName == "Ruins_Column_B" ||
+            objectName == "Desert_Cactus" ||
+            objectName == "Castle_Column_A" ||
+            objectName == "Castle_Column_B" ||
+            objectName == "Castle_Torch" ||
+            objectName.StartsWith("Pipe_", StringComparison.Ordinal) ||
+            objectName.StartsWith("Spikes_", StringComparison.Ordinal)
+        )
+        {
+            return true;
+        }
+
+        return IsGroundedEnemy(objectName);
+    }
+
+    private static void ConfigureGroundedEnemyCollider(
+        GameObject enemy,
+        SpriteRenderer renderer
+    )
+    {
+        BoxCollider2D collider = enemy.GetComponent<BoxCollider2D>();
+
+        if (collider == null || renderer.sprite == null)
+        {
+            return;
+        }
+
+        Sprite sprite = renderer.sprite;
+        collider.size = new Vector2(
+            sprite.bounds.size.x * 0.72f,
+            sprite.bounds.size.y * 0.72f
+        );
+        collider.offset = new Vector2(
+            sprite.bounds.center.x,
+            sprite.bounds.min.y +
+            EnemyColliderFootInset +
+            collider.size.y * 0.5f
+        );
+        EditorUtility.SetDirty(collider);
+    }
+
+    private static void ConfigureExistingBridgeColliders(
+        Transform obstacleRoot
+    )
+    {
+        foreach (Transform child in obstacleRoot)
+        {
+            if (!child.name.Contains("Bridge"))
+            {
+                continue;
+            }
+
+            ConfigureBridgeCollider(child.gameObject);
+        }
+    }
+
+    private static void ConfigureExistingPlatformColliders(
+        LevelPlan plan,
+        Transform obstacleRoot
+    )
+    {
+        float targetScaleX =
+            plan.PlatformScale * plan.PlatformWidthScale;
+
+        foreach (Transform child in obstacleRoot)
+        {
+            if (!child.name.StartsWith("Platform_", StringComparison.Ordinal))
+            {
+                continue;
+            }
+
+            SpriteRenderer renderer = child.GetComponent<SpriteRenderer>();
+            BoxCollider2D collider = child.GetComponent<BoxCollider2D>();
+
+            if (renderer == null || renderer.sprite == null || collider == null)
+            {
+                continue;
+            }
+
+            child.localScale = new Vector3(
+                targetScaleX,
+                plan.PlatformScale,
+                child.localScale.z
+            );
+            ConfigurePlatformCollider(renderer.sprite, collider);
+            EditorUtility.SetDirty(child);
+            EditorUtility.SetDirty(collider);
+        }
+    }
+
+    private static void ConfigurePlatformCollider(
+        Sprite sprite,
+        BoxCollider2D collider
+    )
+    {
+        float colliderHeight = Mathf.Clamp(
+            sprite.bounds.size.y * 0.12f,
+            0.08f,
+            0.14f
+        );
+        float deckTop =
+            sprite.bounds.min.y +
+            sprite.bounds.size.y * GetPlatformDeckTopRatio(sprite.name);
+
+        collider.size = new Vector2(
+            sprite.bounds.size.x * 0.9f,
+            colliderHeight
+        );
+        collider.offset = new Vector2(
+            sprite.bounds.center.x,
+            deckTop - colliderHeight * 0.5f
+        );
+    }
+
+    private static float GetPlatformDeckTopRatio(string spriteName)
+    {
+        switch (spriteName)
+        {
+            case "Objects_037":
+                return 0.44f;
+            case "Objects_018":
+                return 0.57f;
+            case "Grounds_058":
+                return 0.59f;
+            case "Grounds_038":
+                return 0.94f;
+            default:
+                return 0.96f;
+        }
+    }
+
+    private static void ConfigureBridgeCollider(GameObject bridge)
+    {
+        SpriteRenderer renderer = bridge.GetComponent<SpriteRenderer>();
+        BoxCollider2D collider = bridge.GetComponent<BoxCollider2D>();
+
+        if (renderer == null || renderer.sprite == null || collider == null)
+        {
+            return;
+        }
+
+        Sprite sprite = renderer.sprite;
+        float colliderHeight = Mathf.Max(
+            0.12f,
+            sprite.bounds.size.y * 0.12f
+        );
+        float deckTop =
+            sprite.bounds.min.y + sprite.bounds.size.y * 0.55f;
+        collider.size = new Vector2(
+            sprite.bounds.size.x * 0.72f,
+            colliderHeight
+        );
+        collider.offset = new Vector2(
+            sprite.bounds.center.x,
+            deckTop - colliderHeight * 0.5f
+        );
+        EditorUtility.SetDirty(bridge);
+        EditorUtility.SetDirty(collider);
+    }
+
+    private static void ApplyPoweredPassageClearance(
+        LevelPlan plan,
+        Transform obstacleRoot
+    )
+    {
+        Transform[] allObjects =
+            obstacleRoot.GetComponentsInChildren<Transform>(true);
+
+        for (int rowIndex = 0; rowIndex < plan.BlockRows.Count; rowIndex++)
+        {
+            string prefix = "Block_" + rowIndex + "_";
+            List<Transform> blocks = allObjects
+                .Where(item => item.name.StartsWith(
+                    prefix,
+                    StringComparison.Ordinal
+                ))
+                .ToList();
+
+            if (blocks.Count == 0)
+            {
+                continue;
+            }
+
+            float desiredY = Mathf.Max(
+                blocks.Max(item => item.position.y),
+                plan.BlockRows[rowIndex].y
+            );
+
+            foreach (Transform block in blocks)
+            {
+                if (desiredY - block.position.y <= 0.01f)
+                {
+                    continue;
+                }
+
+                block.position = new Vector3(
+                    block.position.x,
+                    desiredY,
+                    block.position.z
+                );
+                EditorUtility.SetDirty(block);
+            }
+
+            RaiseCoinsAboveBlocks(obstacleRoot, blocks);
+        }
+    }
+
+    private static void RaiseCoinsAboveBlocks(
+        Transform obstacleRoot,
+        List<Transform> blocks
+    )
+    {
+        List<SpriteRenderer> blockRenderers = blocks
+            .Select(item => item.GetComponent<SpriteRenderer>())
+            .Where(item => item != null)
+            .ToList();
+
+        if (blockRenderers.Count == 0)
+        {
+            return;
+        }
+
+        float left = blockRenderers.Min(item => item.bounds.min.x);
+        float right = blockRenderers.Max(item => item.bounds.max.x);
+        float blockTop = blockRenderers.Max(item => item.bounds.max.y);
+        float blockCenter = blocks.Average(item => item.position.y);
+
+        foreach (
+            SpriteRenderer coin in
+            obstacleRoot.GetComponentsInChildren<SpriteRenderer>(true)
+        )
+        {
+            if (
+                !coin.name.StartsWith("Coin_", StringComparison.Ordinal) ||
+                coin.bounds.max.x < left ||
+                coin.bounds.min.x > right ||
+                coin.transform.position.y < blockCenter - 0.25f
+            )
+            {
+                continue;
+            }
+
+            float requiredBottom = blockTop + CoinBlockClearance;
+
+            if (coin.bounds.min.y < requiredBottom)
+            {
+                coin.transform.position += Vector3.up *
+                    (requiredBottom - coin.bounds.min.y);
+                EditorUtility.SetDirty(coin.transform);
+            }
+        }
+    }
+
+    private static void ValidatePoweredPassageClearance(
+        LevelPlan plan,
+        Transform terrainRoot,
+        Transform obstacleRoot
+    )
+    {
+        List<BoxCollider2D> terrainColliders = terrainRoot
+            .GetComponentsInChildren<BoxCollider2D>()
+            .Where(item => item.enabled && item.gameObject.activeInHierarchy)
+            .ToList();
+        Transform[] allObjects =
+            obstacleRoot.GetComponentsInChildren<Transform>(true);
+
+        for (int rowIndex = 0; rowIndex < plan.BlockRows.Count; rowIndex++)
+        {
+            string prefix = "Block_" + rowIndex + "_";
+            List<SpriteRenderer> blocks = allObjects
+                .Where(item => item.name.StartsWith(
+                    prefix,
+                    StringComparison.Ordinal
+                ))
+                .Select(item => item.GetComponent<SpriteRenderer>())
+                .Where(item => item != null && item.enabled)
+                .ToList();
+
+            foreach (SpriteRenderer block in blocks)
+            {
+                float groundTop = terrainColliders
+                    .Where(item =>
+                        item.bounds.max.x > block.bounds.min.x &&
+                        item.bounds.min.x < block.bounds.max.x &&
+                        item.bounds.max.y <= block.bounds.min.y + 0.01f
+                    )
+                    .Select(item => item.bounds.max.y)
+                    .DefaultIfEmpty(float.NegativeInfinity)
+                    .Max();
+
+                if (float.IsNegativeInfinity(groundTop))
+                {
+                    continue;
+                }
+
+                float clearance = block.bounds.min.y - groundTop;
+
+                if (clearance + 0.01f < PoweredPassageClearance)
+                {
+                    throw new InvalidOperationException(
+                        string.Format(
+                            "{0} has only {1:F2} units below {2}; " +
+                            "{3:F2} units are required for powered traversal.",
+                            block.name,
+                            clearance,
+                            plan.DisplayName,
+                            PoweredPassageClearance
+                        )
+                    );
+                }
+            }
+        }
+    }
+
+    private static void ValidateGroundedObjectAlignment(
+        LevelPlan plan,
+        params Transform[] roots
+    )
+    {
+        foreach (Transform root in roots)
+        {
+            if (root == null)
+            {
+                continue;
+            }
+
+            foreach (Transform child in root)
+            {
+                if (!IsKnownGroundedObject(child.name))
+                {
+                    continue;
+                }
+
+                SpriteRenderer renderer =
+                    child.GetComponentInChildren<SpriteRenderer>();
+
+                if (renderer == null || renderer.sprite == null)
+                {
+                    continue;
+                }
+
+                float expectedBottom =
+                    FindGroundTop(plan, child.position.x) -
+                    GroundVisualOverlap;
+                float alignmentError = Mathf.Abs(
+                    renderer.bounds.min.y - expectedBottom
+                );
+
+                if (alignmentError > 0.015f)
+                {
+                    throw new InvalidOperationException(
+                        string.Format(
+                            "{0} in {1} is {2:F3} units away from its ground contact.",
+                            child.name,
+                            plan.DisplayName,
+                            alignmentError
+                        )
+                    );
+                }
+
+                if (!IsGroundedEnemy(child.name))
+                {
+                    continue;
+                }
+
+                BoxCollider2D collider = child.GetComponent<BoxCollider2D>();
+
+                if (collider == null)
+                {
+                    continue;
+                }
+
+                float colliderBottom =
+                    collider.offset.y - collider.size.y * 0.5f;
+                float expectedColliderBottom =
+                    renderer.sprite.bounds.min.y +
+                    EnemyColliderFootInset;
+
+                if (
+                    Mathf.Abs(
+                        colliderBottom - expectedColliderBottom
+                    ) > 0.005f
+                )
+                {
+                    throw new InvalidOperationException(
+                        string.Format(
+                            "{0} in {1} has a collider that does not meet the sprite feet.",
+                            child.name,
+                            plan.DisplayName
+                        )
+                    );
+                }
+            }
+        }
+    }
+
+    private static void ValidatePlatformColliders(
+        LevelPlan plan,
+        Transform obstacleRoot
+    )
+    {
+        float expectedScaleX =
+            plan.PlatformScale * plan.PlatformWidthScale;
+
+        foreach (Transform child in obstacleRoot)
+        {
+            if (!child.name.StartsWith("Platform_", StringComparison.Ordinal))
+            {
+                continue;
+            }
+
+            SpriteRenderer renderer = child.GetComponent<SpriteRenderer>();
+            BoxCollider2D collider = child.GetComponent<BoxCollider2D>();
+
+            if (renderer == null || renderer.sprite == null || collider == null)
+            {
+                throw new InvalidOperationException(
+                    child.name + " in " + plan.DisplayName +
+                    " is missing its platform renderer or collider."
+                );
+            }
+
+            Sprite sprite = renderer.sprite;
+            float expectedTop =
+                sprite.bounds.min.y +
+                sprite.bounds.size.y * GetPlatformDeckTopRatio(sprite.name);
+            float colliderTop =
+                collider.offset.y + collider.size.y * 0.5f;
+
+            if (
+                Mathf.Abs(colliderTop - expectedTop) > 0.005f ||
+                Mathf.Abs(child.localScale.x - expectedScaleX) > 0.005f
+            )
+            {
+                throw new InvalidOperationException(
+                    child.name + " in " + plan.DisplayName +
+                    " does not match its visible deck."
+                );
+            }
+        }
+    }
+
+    private static void ValidatePoweredTerrainClearance(
+        LevelPlan plan,
+        Transform terrainRoot
+    )
+    {
+        int primarySegmentCount = GetPrimarySegmentCount(plan);
+        List<BoxCollider2D> lowerColliders = new List<BoxCollider2D>();
+
+        for (int index = 0; index < primarySegmentCount; index++)
+        {
+            GameObject group = FindChild(
+                terrainRoot,
+                "Ground_" + (index + 1)
+            );
+
+            if (group != null)
+            {
+                lowerColliders.AddRange(
+                    group.GetComponentsInChildren<BoxCollider2D>()
+                );
+            }
+        }
+
+        for (
+            int index = primarySegmentCount;
+            index < plan.Segments.Count;
+            index++
+        )
+        {
+            GameObject upperGroup = FindChild(
+                terrainRoot,
+                "Ground_" + (index + 1)
+            );
+
+            if (upperGroup == null)
+            {
+                continue;
+            }
+
+            BoxCollider2D[] upperColliders = upperGroup
+                .GetComponentsInChildren<BoxCollider2D>();
+
+            if (upperColliders.Length == 0)
+            {
+                continue;
+            }
+
+            float upperLeft = upperColliders.Min(item => item.bounds.min.x);
+            float upperRight = upperColliders.Max(item => item.bounds.max.x);
+            float upperBottom = upperColliders.Min(item => item.bounds.min.y);
+            float lowerTop = lowerColliders
+                .Where(item =>
+                    item.bounds.max.x > upperLeft &&
+                    item.bounds.min.x < upperRight &&
+                    item.bounds.max.y <= upperBottom + 0.01f
+                )
+                .Select(item => item.bounds.max.y)
+                .DefaultIfEmpty(float.NegativeInfinity)
+                .Max();
+
+            if (float.IsNegativeInfinity(lowerTop))
+            {
+                continue;
+            }
+
+            float clearance = upperBottom - lowerTop;
+
+            if (clearance + 0.01f < PoweredPassageClearance)
+            {
+                throw new InvalidOperationException(
+                    string.Format(
+                        "Ground_{0} in {1} has only {2:F2} units below it; " +
+                        "{3:F2} units are required for powered traversal.",
+                        index + 1,
+                        plan.DisplayName,
+                        clearance,
+                        PoweredPassageClearance
+                    )
+                );
+            }
+        }
+    }
+
     private static string GetLevelPath(int levelNumber)
     {
         return string.Format(
@@ -220,6 +1352,10 @@ public static class MidtermSevenLevelBuilder
         BuildGuideSpecificStructures(plan, obstacleRoot.transform);
         BuildEnemies(plan, enemyRoot.transform, scene);
         BuildProgression(plan, progressionRoot.transform);
+        ConfigureRequiredHud(levelRoot, plan.Number);
+        ConfigureExistingBoss(levelRoot, plan);
+        ConfigureBirdAttacks();
+        ConfigureEnemyStompRules();
     }
 
     private static void PreserveCommonObjects(
@@ -261,6 +1397,11 @@ public static class MidtermSevenLevelBuilder
             FloorY + 0.58f,
             0f
         );
+
+        if (player.GetComponent<PlayerPowerUp>() == null)
+        {
+            player.AddComponent<PlayerPowerUp>();
+        }
 
         GameObject ui = FindChild(levelRoot.transform, "Level0_UI");
 
@@ -452,7 +1593,7 @@ public static class MidtermSevenLevelBuilder
                 platformSprite,
                 new Vector3(spec.X, spec.Y, 0f),
                 new Vector3(
-                    plan.PlatformScale,
+                    plan.PlatformScale * plan.PlatformWidthScale,
                     plan.PlatformScale,
                     1f
                 ),
@@ -461,14 +1602,7 @@ public static class MidtermSevenLevelBuilder
             );
             platform.layer = LayerMask.NameToLayer("Ground");
             BoxCollider2D collider = platform.AddComponent<BoxCollider2D>();
-            collider.size = new Vector2(
-                platformSprite.bounds.size.x * 0.9f,
-                Mathf.Max(0.12f, platformSprite.bounds.size.y * 0.18f)
-            );
-            collider.offset = new Vector2(
-                platformSprite.bounds.center.x,
-                platformSprite.bounds.max.y - collider.size.y * 0.5f
-            );
+            ConfigurePlatformCollider(platformSprite, collider);
 
             if (spec.Moving)
             {
@@ -484,10 +1618,15 @@ public static class MidtermSevenLevelBuilder
 
         Sprite spring = LoadRawSprite("Objects", "Objects_002");
         Vector2 springPosition = GetSpringPosition(plan.Number);
+        float springGround = FindGroundTop(plan, springPosition.x);
         CreateSpriteObject(
             "Spring",
             spring,
-            new Vector3(springPosition.x, springPosition.y, 0f),
+            new Vector3(
+                springPosition.x,
+                GetGroundedY(springGround, spring, 1f),
+                0f
+            ),
             Vector3.one,
             parent,
             7
@@ -502,7 +1641,7 @@ public static class MidtermSevenLevelBuilder
             GameObject pipeObject = CreateSpriteObject(
                 "Pipe_" + (index + 1),
                 pipe,
-                new Vector3(x, top + pipe.bounds.extents.y, 0f),
+                new Vector3(x, GetGroundedY(top, pipe, 1f), 0f),
                 Vector3.one,
                 parent,
                 6
@@ -588,7 +1727,6 @@ public static class MidtermSevenLevelBuilder
     private static void BuildHazards(LevelPlan plan, Transform parent)
     {
         Sprite liquid = LoadRawSprite("Grounds", plan.HazardSprite);
-        Sprite spike = LoadRawSprite("Objects", "Objects_054");
 
         List<Segment> ordered = plan.Segments
             .OrderBy(segment => segment.Start)
@@ -646,23 +1784,82 @@ public static class MidtermSevenLevelBuilder
             }
         }
 
+        BuildSpikeHazards(plan, parent);
+    }
+
+    private static void BuildSpikeHazards(
+        LevelPlan plan,
+        Transform parent
+    )
+    {
+        Sprite spike = LoadRawSprite("Objects", "Objects_054");
+
         for (int index = 0; index < plan.SpikeXs.Count; index++)
         {
             float x = plan.SpikeXs[index];
             float top = FindGroundTop(plan, x);
-            CreateSpriteObject(
+            GameObject spikeObject = CreateSpriteObject(
                 "Spikes_" + (index + 1),
                 spike,
                 new Vector3(
                     x,
-                    top + spike.bounds.extents.y * 0.72f,
+                    GetGroundedY(top, spike, 0.72f),
                     0f
                 ),
                 new Vector3(0.72f, 0.72f, 1f),
                 parent,
                 6
             );
+            ConfigureSpikeHazard(spikeObject);
         }
+    }
+
+    private static void RebuildExistingSpikeHazards(
+        LevelPlan plan,
+        Transform obstacleRoot
+    )
+    {
+        List<GameObject> existingSpikes = new List<GameObject>();
+
+        foreach (Transform child in obstacleRoot)
+        {
+            if (!child.name.StartsWith("Spikes_", StringComparison.Ordinal))
+            {
+                continue;
+            }
+
+            existingSpikes.Add(child.gameObject);
+        }
+
+        foreach (GameObject existingSpike in existingSpikes)
+        {
+            UnityEngine.Object.DestroyImmediate(existingSpike);
+        }
+
+        BuildSpikeHazards(plan, obstacleRoot);
+    }
+
+    private static void ConfigureSpikeHazard(GameObject spikeObject)
+    {
+        Collider2D spikeCollider = spikeObject.GetComponent<Collider2D>();
+
+        if (spikeCollider == null)
+        {
+            spikeCollider = spikeObject.AddComponent<PolygonCollider2D>();
+        }
+
+        spikeCollider.isTrigger = true;
+
+        SpikeHazard hazard = spikeObject.GetComponent<SpikeHazard>();
+
+        if (hazard == null)
+        {
+            hazard = spikeObject.AddComponent<SpikeHazard>();
+        }
+
+        EditorUtility.SetDirty(spikeObject);
+        EditorUtility.SetDirty(spikeCollider);
+        EditorUtility.SetDirty(hazard);
     }
 
     private static void BuildDecorations(
@@ -866,26 +2063,6 @@ public static class MidtermSevenLevelBuilder
                 );
                 break;
             case 3:
-                PlaceBridge(
-                    plan,
-                    12f,
-                    -2.82f,
-                    1.35f,
-                    parent,
-                    "Waterfall_Entry_Bridge"
-                );
-                PlaceVerticalRope(
-                    57f,
-                    -0.7f,
-                    parent,
-                    "Climb_Rope_Left"
-                );
-                PlaceVerticalRope(
-                    59f,
-                    -0.7f,
-                    parent,
-                    "Climb_Rope_Right"
-                );
                 PlaceRawVisual(
                     "Effects",
                     "Effects_074",
@@ -1104,7 +2281,7 @@ public static class MidtermSevenLevelBuilder
         return CreateSpriteObject(
             objectName,
             sprite,
-            new Vector3(x, top + sprite.bounds.extents.y * scale, 0f),
+            new Vector3(x, GetGroundedY(top, sprite, scale), 0f),
             new Vector3(scale, scale, 1f),
             parent,
             sortingOrder
@@ -1120,14 +2297,30 @@ public static class MidtermSevenLevelBuilder
         string objectName
     )
     {
-        PlaceSolidVisual(
+        GameObject bridge = PlaceRawVisual(
             "Tiles",
             "Tiles_047",
             new Vector3(x, y, 0f),
             scale,
             parent,
-            objectName
+            objectName,
+            5
         );
+        bridge.layer = LayerMask.NameToLayer("Ground");
+        bridge.AddComponent<BoxCollider2D>();
+        ConfigureBridgeCollider(bridge);
+    }
+
+    private static float GetGroundedY(
+        float groundTop,
+        Sprite sprite,
+        float scale
+    )
+    {
+        return
+            groundTop -
+            GroundVisualOverlap -
+            sprite.bounds.min.y * scale;
     }
 
     private static void PlaceVerticalRope(
@@ -1246,20 +2439,38 @@ public static class MidtermSevenLevelBuilder
                 renderer.sortingOrder = 9;
             }
 
-            float y = spec.Flying
-                ? spec.Y
-                : FindGroundTop(plan, spec.X) + 0.48f;
+            float y = spec.Y;
+
+            if (!spec.Flying)
+            {
+                float groundTop = FindGroundTop(plan, spec.X);
+                y = renderer != null && renderer.sprite != null
+                    ? GetGroundedY(
+                        groundTop,
+                        renderer.sprite,
+                        enemy.transform.localScale.y
+                    )
+                    : groundTop + 0.48f;
+            }
+
             enemy.transform.position = new Vector3(spec.X, y, 0f);
 
             BoxCollider2D collider = enemy.GetComponent<BoxCollider2D>();
 
             if (collider != null && renderer != null && renderer.sprite != null)
             {
-                collider.size = new Vector2(
-                    renderer.sprite.bounds.size.x * 0.72f,
-                    renderer.sprite.bounds.size.y * 0.72f
-                );
-                collider.offset = Vector2.zero;
+                if (spec.Flying)
+                {
+                    collider.size = new Vector2(
+                        renderer.sprite.bounds.size.x * 0.72f,
+                        renderer.sprite.bounds.size.y * 0.72f
+                    );
+                    collider.offset = Vector2.zero;
+                }
+                else
+                {
+                    ConfigureGroundedEnemyCollider(enemy, renderer);
+                }
             }
         }
     }
@@ -1271,32 +2482,45 @@ public static class MidtermSevenLevelBuilder
     {
         Sprite fireFlower = LoadRawSprite("Pickups", "Pickups_020");
         float flowerGround = FindGroundTop(plan, plan.FireFlowerX);
-        CreateSpriteObject(
+        GameObject fireFlowerObject = CreateSpriteObject(
             "FireFlower_PowerUp_Placement",
             fireFlower,
             new Vector3(
                 plan.FireFlowerX,
-                flowerGround + fireFlower.bounds.extents.y,
+                GetGroundedY(flowerGround, fireFlower, 0.72f),
                 0f
             ),
             new Vector3(0.72f, 0.72f, 1f),
             parent,
             10
         );
+        CircleCollider2D flowerCollider =
+            fireFlowerObject.AddComponent<CircleCollider2D>();
+        flowerCollider.isTrigger = true;
+        flowerCollider.radius = Mathf.Min(
+            fireFlower.bounds.extents.x,
+            fireFlower.bounds.extents.y
+        ) * 0.85f;
+        fireFlowerObject.AddComponent<FireFlowerPowerUp>();
 
         Sprite checkpoint = LoadRawSprite("Objects", "Objects_066");
         float checkpointGround = FindGroundTop(plan, plan.CheckpointX);
-        CreateSpriteObject(
+        GameObject checkpointObject = CreateSpriteObject(
             "Checkpoint_Placement",
             checkpoint,
             new Vector3(
                 plan.CheckpointX,
-                checkpointGround + checkpoint.bounds.extents.y,
+                GetGroundedY(checkpointGround, checkpoint, 0.82f),
                 0f
             ),
             new Vector3(0.82f, 0.82f, 1f),
             parent,
             9
+        );
+        ConfigureCheckpointObject(
+            checkpointObject,
+            plan,
+            checkpointGround
         );
 
         Sprite key = LoadRawSprite("Pickups", "Pickups_036");
@@ -1316,7 +2540,7 @@ public static class MidtermSevenLevelBuilder
             door,
             new Vector3(
                 plan.DoorX,
-                doorGround + door.bounds.extents.y,
+                GetGroundedY(doorGround, door, 0.9f),
                 0f
             ),
             new Vector3(0.9f, 0.9f, 1f),
@@ -1334,7 +2558,7 @@ public static class MidtermSevenLevelBuilder
                 boss,
                 new Vector3(
                     bossX,
-                    bossGround + boss.bounds.extents.y * 0.9f,
+                    GetGroundedY(bossGround, boss, 0.9f),
                     0f
                 ),
                 new Vector3(0.9f, 0.9f, 1f),
@@ -1361,7 +2585,7 @@ public static class MidtermSevenLevelBuilder
             goalSprite,
             new Vector3(
                 plan.GoalX,
-                goalGround + goalSprite.bounds.extents.y,
+                GetGroundedY(goalGround, goalSprite, 1f),
                 0f
             ),
             Vector3.one,
@@ -1383,6 +2607,640 @@ public static class MidtermSevenLevelBuilder
 
         GameObject startMarker = CreateGroup("START_x-7", parent);
         startMarker.transform.position = new Vector3(PlayerStartX, FloorY, 0f);
+    }
+
+    private static void ConfigureRequiredHud(
+        GameObject levelRoot,
+        int levelNumber
+    )
+    {
+        GameObject uiObject = FindChild(
+            levelRoot.transform,
+            "Level" + levelNumber + "_UI"
+        );
+        GameObject player = FindChild(levelRoot.transform, "Player");
+
+        if (uiObject == null || player == null)
+        {
+            throw new InvalidOperationException(
+                "The generated level is missing its UI or player."
+            );
+        }
+
+        Text coinCountText = FindText(uiObject.transform, "Score_Text");
+        Text livesText = FindText(uiObject.transform, "Lives_Text");
+        Font font =
+            (coinCountText != null ? coinCountText.font : null) ??
+            (livesText != null ? livesText.font : null) ??
+            Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
+
+        coinCountText = GetOrCreateHudText(
+            uiObject.transform,
+            "Score_Text",
+            font
+        );
+        livesText = GetOrCreateHudText(
+            uiObject.transform,
+            "Lives_Text",
+            font
+        );
+        Text totalScoreText = GetOrCreateHudText(
+            uiObject.transform,
+            "TotalScore_Text",
+            font
+        );
+        Text timerText = GetOrCreateHudText(
+            uiObject.transform,
+            "Timer_Text",
+            font
+        );
+
+        ConfigureHudTextRect(
+            livesText,
+            "LIVES  3",
+            new Vector2(0f, 1f),
+            new Vector2(24f, -105f),
+            new Vector2(300f, 50f),
+            TextAnchor.MiddleLeft
+        );
+        ConfigureHudTextRect(
+            coinCountText,
+            "00",
+            new Vector2(0f, 1f),
+            new Vector2(25f, -22f),
+            new Vector2(112f, 65f),
+            TextAnchor.MiddleCenter
+        );
+        ConfigureHudTextRect(
+            totalScoreText,
+            "SCORE  000000",
+            new Vector2(1f, 1f),
+            new Vector2(-24f, -22f),
+            new Vector2(320f, 50f),
+            TextAnchor.MiddleRight
+        );
+        ConfigureHudTextRect(
+            timerText,
+            "TIME  180",
+            new Vector2(1f, 1f),
+            new Vector2(-24f, -72f),
+            new Vector2(320f, 50f),
+            TextAnchor.MiddleRight
+        );
+
+        Text bossHealthText = FindText(
+            uiObject.transform,
+            "BossHealth_Text"
+        );
+
+        if (levelNumber == 7)
+        {
+            bossHealthText = GetOrCreateHudText(
+                uiObject.transform,
+                "BossHealth_Text",
+                font
+            );
+            bossHealthText.fontSize = 32;
+            bossHealthText.color = new Color(1f, 0.82f, 0.2f, 1f);
+            ConfigureHudTextRect(
+                bossHealthText,
+                "BOSS  10 / 10",
+                new Vector2(0.5f, 1f),
+                new Vector2(0f, -78f),
+                new Vector2(420f, 54f),
+                TextAnchor.MiddleCenter
+            );
+        }
+        else if (bossHealthText != null)
+        {
+            bossHealthText.gameObject.SetActive(false);
+        }
+
+        Transform coinIcon = uiObject
+            .GetComponentsInChildren<Transform>(true)
+            .FirstOrDefault(item => item.name == "Coin_Icon");
+
+        if (coinIcon != null)
+        {
+            coinIcon.gameObject.SetActive(true);
+            EditorUtility.SetDirty(coinIcon.gameObject);
+        }
+
+        Text obsoleteCoinsText = FindText(
+            uiObject.transform,
+            "Coins_Text"
+        );
+
+        if (obsoleteCoinsText != null)
+        {
+            obsoleteCoinsText.gameObject.SetActive(false);
+            EditorUtility.SetDirty(obsoleteCoinsText.gameObject);
+        }
+
+        GameObject messagePanel = uiObject
+            .GetComponentsInChildren<Transform>(true)
+            .Select(item => item.gameObject)
+            .FirstOrDefault(item => item.name == "Message_Panel");
+        Text messageText = FindText(uiObject.transform, "Message_Text");
+        PlayerHealth health = player.GetComponent<PlayerHealth>();
+        GameHUD hud = uiObject.GetComponent<GameHUD>();
+
+        if (
+            messagePanel == null ||
+            messageText == null ||
+            health == null ||
+            hud == null
+        )
+        {
+            throw new InvalidOperationException(
+                "The generated level HUD is missing a required component."
+            );
+        }
+
+        hud.Configure(
+            totalScoreText,
+            livesText,
+            coinCountText,
+            timerText,
+            messagePanel,
+            messageText,
+            health,
+            180f
+        );
+        hud.ConfigureBossHealth(
+            levelNumber == 7 ? bossHealthText : null
+        );
+
+        EditorUtility.SetDirty(uiObject);
+        EditorUtility.SetDirty(hud);
+    }
+
+    private static Text FindText(Transform parent, string objectName)
+    {
+        return parent
+            .GetComponentsInChildren<Text>(true)
+            .FirstOrDefault(item => item.name == objectName);
+    }
+
+    private static Text GetOrCreateHudText(
+        Transform parent,
+        string objectName,
+        Font font
+    )
+    {
+        Text text = FindText(parent, objectName);
+
+        if (text == null)
+        {
+            GameObject textObject = new GameObject(
+                objectName,
+                typeof(RectTransform)
+            );
+            textObject.transform.SetParent(parent, false);
+            textObject.layer = LayerMask.NameToLayer("UI");
+            text = textObject.AddComponent<Text>();
+        }
+
+        text.font = font;
+        text.fontSize = 30;
+        text.fontStyle = FontStyle.Bold;
+        text.color = Color.white;
+        text.raycastTarget = false;
+        text.horizontalOverflow = HorizontalWrapMode.Overflow;
+        text.verticalOverflow = VerticalWrapMode.Overflow;
+
+        Outline outline = text.GetComponent<Outline>();
+
+        if (outline == null)
+        {
+            outline = text.gameObject.AddComponent<Outline>();
+        }
+
+        outline.effectColor = new Color(0f, 0f, 0f, 0.9f);
+        outline.effectDistance = new Vector2(2f, -2f);
+        outline.useGraphicAlpha = true;
+        EditorUtility.SetDirty(text);
+        EditorUtility.SetDirty(outline);
+        return text;
+    }
+
+    private static void ConfigureHudTextRect(
+        Text text,
+        string initialText,
+        Vector2 anchor,
+        Vector2 position,
+        Vector2 size,
+        TextAnchor alignment
+    )
+    {
+        text.text = initialText;
+        text.alignment = alignment;
+        RectTransform rect = text.rectTransform;
+        rect.anchorMin = anchor;
+        rect.anchorMax = anchor;
+        rect.pivot = anchor;
+        rect.anchoredPosition = position;
+        rect.sizeDelta = size;
+        rect.localScale = Vector3.one;
+        EditorUtility.SetDirty(rect);
+    }
+
+    private static void ConfigureBirdAttacks()
+    {
+        foreach (
+            BirdEnemy bird in
+            UnityEngine.Object.FindObjectsOfType<BirdEnemy>(true)
+        )
+        {
+            bird.ConfigureAttack(5f, 6f, 3.5f, 1.1f, 2.4f);
+            EditorUtility.SetDirty(bird);
+        }
+    }
+
+    private static void ConfigureEnemyStompRules()
+    {
+        foreach (
+            EnemyBase enemy in
+            UnityEngine.Object.FindObjectsOfType<EnemyBase>(true)
+        )
+        {
+            SpriteRenderer renderer = enemy.GetComponent<SpriteRenderer>();
+            bool usesGoombaSprite =
+                renderer != null &&
+                renderer.sprite != null &&
+                renderer.sprite.name == "Enemies_007";
+
+            if (usesGoombaSprite || enemy is BirdEnemy)
+            {
+                enemy.ConfigureStomp(true);
+                EditorUtility.SetDirty(enemy);
+            }
+        }
+    }
+
+    private static void ConfigureExistingBoss(
+        GameObject levelRoot,
+        LevelPlan plan
+    )
+    {
+        GameObject bossObject = FindDescendant(
+            levelRoot.transform,
+            "Boss_Placement"
+        );
+
+        if (!plan.HasBoss)
+        {
+            if (bossObject != null)
+            {
+                UnityEngine.Object.DestroyImmediate(bossObject);
+            }
+
+            return;
+        }
+
+        if (bossObject == null)
+        {
+            throw new InvalidOperationException(
+                "Boss_Placement is missing in " + plan.DisplayName
+            );
+        }
+
+        GameObject leftMarker = FindDescendant(
+            levelRoot.transform,
+            "BossArena_Left_x96"
+        );
+        GameObject rightMarker = FindDescendant(
+            levelRoot.transform,
+            "BossArena_Right_x104"
+        );
+
+        if (leftMarker == null || rightMarker == null)
+        {
+            throw new InvalidOperationException(
+                "Boss arena markers are missing in " + plan.DisplayName
+            );
+        }
+
+        Rigidbody2D bossBody = bossObject.GetComponent<Rigidbody2D>();
+
+        if (bossBody == null)
+        {
+            bossBody = bossObject.AddComponent<Rigidbody2D>();
+        }
+
+        bossBody.bodyType = RigidbodyType2D.Dynamic;
+        bossBody.gravityScale = 3f;
+        bossBody.constraints = RigidbodyConstraints2D.FreezeRotation;
+        bossBody.collisionDetectionMode = CollisionDetectionMode2D.Continuous;
+        bossBody.interpolation = RigidbodyInterpolation2D.Interpolate;
+
+        BoxCollider2D bossCollider = bossObject.GetComponent<BoxCollider2D>();
+
+        if (bossCollider == null)
+        {
+            bossCollider = bossObject.AddComponent<BoxCollider2D>();
+        }
+
+        bossCollider.isTrigger = false;
+        SpriteRenderer bossRenderer =
+            bossObject.GetComponent<SpriteRenderer>();
+
+        if (bossRenderer == null || bossRenderer.sprite == null)
+        {
+            throw new InvalidOperationException(
+                "The boss sprite is missing in " + plan.DisplayName
+            );
+        }
+
+        Bounds spriteBounds = bossRenderer.sprite.bounds;
+        bossCollider.size = new Vector2(
+            spriteBounds.size.x * 0.72f,
+            spriteBounds.size.y * 0.82f
+        );
+        bossCollider.offset = new Vector2(
+            spriteBounds.center.x,
+            spriteBounds.min.y + bossCollider.size.y * 0.5f + 0.02f
+        );
+
+        BossEnemy boss = bossObject.GetComponent<BossEnemy>();
+
+        if (boss == null)
+        {
+            boss = bossObject.AddComponent<BossEnemy>();
+        }
+
+        boss.Configure(
+            leftMarker.transform.position.x,
+            rightMarker.transform.position.x,
+            10
+        );
+
+        EditorUtility.SetDirty(bossObject);
+        EditorUtility.SetDirty(bossBody);
+        EditorUtility.SetDirty(bossCollider);
+        EditorUtility.SetDirty(boss);
+    }
+
+    private static void RemoveUnnecessaryLevel3Structures(
+        GameObject levelRoot,
+        LevelPlan plan
+    )
+    {
+        if (plan.Number != 3)
+        {
+            return;
+        }
+
+        string[] unnecessaryNames =
+        {
+            "Waterfall_Entry_Bridge",
+            "Climb_Rope_Left",
+            "Climb_Rope_Right"
+        };
+
+        foreach (string objectName in unnecessaryNames)
+        {
+            GameObject structure = FindDescendant(
+                levelRoot.transform,
+                objectName
+            );
+
+            if (structure != null)
+            {
+                UnityEngine.Object.DestroyImmediate(structure);
+            }
+        }
+    }
+
+    private static void ValidateRequiredSystems(
+        GameObject levelRoot,
+        LevelPlan plan
+    )
+    {
+        GameObject uiObject = FindChild(
+            levelRoot.transform,
+            "Level" + plan.Number + "_UI"
+        );
+
+        if (uiObject == null || uiObject.GetComponent<GameHUD>() == null)
+        {
+            throw new InvalidOperationException(
+                "The required HUD is missing in " + plan.DisplayName
+            );
+        }
+
+        string[] requiredTextNames =
+        {
+            "Lives_Text",
+            "Score_Text",
+            "TotalScore_Text",
+            "Timer_Text"
+        };
+
+        foreach (string textName in requiredTextNames)
+        {
+            if (FindText(uiObject.transform, textName) == null)
+            {
+                throw new InvalidOperationException(
+                    textName + " is missing in " + plan.DisplayName
+                );
+            }
+        }
+
+        BossEnemy boss = FindDescendant(
+            levelRoot.transform,
+            "Boss_Placement"
+        )?.GetComponent<BossEnemy>();
+
+        if (plan.HasBoss)
+        {
+            if (
+                boss == null ||
+                boss.GetComponent<Rigidbody2D>() == null ||
+                boss.GetComponent<Collider2D>() == null ||
+                FindText(uiObject.transform, "BossHealth_Text") == null
+            )
+            {
+                throw new InvalidOperationException(
+                    "The boss battle is not fully configured in " +
+                    plan.DisplayName
+                );
+            }
+        }
+        else if (boss != null)
+        {
+            throw new InvalidOperationException(
+                "An unexpected boss was found in " + plan.DisplayName
+            );
+        }
+
+        if (plan.Number == 3)
+        {
+            string[] removedStructureNames =
+            {
+                "Waterfall_Entry_Bridge",
+                "Climb_Rope_Left",
+                "Climb_Rope_Right"
+            };
+
+            foreach (string objectName in removedStructureNames)
+            {
+                if (
+                    FindDescendant(levelRoot.transform, objectName) != null
+                )
+                {
+                    throw new InvalidOperationException(
+                        objectName + " should be removed from " +
+                        plan.DisplayName
+                    );
+                }
+            }
+        }
+
+        if (
+            GameObject.Find("Checkpoint_Placement")
+                .GetComponent<LevelCheckpoint>() == null
+        )
+        {
+            throw new InvalidOperationException(
+                "The checkpoint is not configured in " + plan.DisplayName
+            );
+        }
+
+        int plannedBirdCount = plan.Enemies.Count(item => item.Flying);
+        int configuredBirdCount =
+            UnityEngine.Object.FindObjectsOfType<BirdEnemy>(true).Length;
+
+        if (configuredBirdCount < plannedBirdCount)
+        {
+            throw new InvalidOperationException(
+                "A planned bird AI is missing in " + plan.DisplayName
+            );
+        }
+
+        foreach (
+            EnemyBase enemy in
+            UnityEngine.Object.FindObjectsOfType<EnemyBase>(true)
+        )
+        {
+            SpriteRenderer renderer = enemy.GetComponent<SpriteRenderer>();
+            bool mustBeStompable =
+                enemy is BirdEnemy ||
+                (
+                    renderer != null &&
+                    renderer.sprite != null &&
+                    renderer.sprite.name == "Enemies_007"
+                );
+
+            if (mustBeStompable && !enemy.CanBeStomped)
+            {
+                throw new InvalidOperationException(
+                    enemy.name + " must be stompable in " +
+                    plan.DisplayName
+                );
+            }
+        }
+
+        ValidateSpikeHazards(plan);
+    }
+
+    private static void ValidateSpikeHazards(LevelPlan plan)
+    {
+        GameObject obstacleRoot = GameObject.Find(
+            "Obstacles_" + plan.DisplayName
+        );
+
+        if (obstacleRoot == null)
+        {
+            throw new InvalidOperationException(
+                "The obstacle root is missing in " + plan.DisplayName
+            );
+        }
+
+        int configuredSpikeCount = 0;
+
+        foreach (Transform child in obstacleRoot.transform)
+        {
+            if (!child.name.StartsWith("Spikes_", StringComparison.Ordinal))
+            {
+                continue;
+            }
+
+            configuredSpikeCount++;
+
+            Collider2D spikeCollider = child.GetComponent<Collider2D>();
+
+            if (
+                spikeCollider == null ||
+                !spikeCollider.isTrigger ||
+                child.GetComponent<SpikeHazard>() == null
+            )
+            {
+                throw new InvalidOperationException(
+                    child.name + " has no damage trigger in " +
+                    plan.DisplayName
+                );
+            }
+        }
+
+        if (configuredSpikeCount != plan.SpikeXs.Count)
+        {
+            throw new InvalidOperationException(
+                "Unexpected spike count in " + plan.DisplayName +
+                ": expected " + plan.SpikeXs.Count +
+                ", found " + configuredSpikeCount
+            );
+        }
+    }
+
+    private static void ConfigureCheckpointObject(
+        GameObject checkpointObject,
+        LevelPlan plan,
+        float checkpointGround
+    )
+    {
+        SpriteRenderer checkpointRenderer =
+            checkpointObject.GetComponent<SpriteRenderer>();
+        BoxCollider2D checkpointCollider =
+            checkpointObject.GetComponent<BoxCollider2D>();
+
+        if (checkpointCollider == null)
+        {
+            checkpointCollider =
+                checkpointObject.AddComponent<BoxCollider2D>();
+        }
+
+        checkpointCollider.isTrigger = true;
+
+        if (
+            checkpointRenderer != null &&
+            checkpointRenderer.sprite != null
+        )
+        {
+            checkpointCollider.size =
+                checkpointRenderer.sprite.bounds.size;
+        }
+
+        LevelCheckpoint levelCheckpoint =
+            checkpointObject.GetComponent<LevelCheckpoint>();
+
+        if (levelCheckpoint == null)
+        {
+            levelCheckpoint =
+                checkpointObject.AddComponent<LevelCheckpoint>();
+        }
+
+        levelCheckpoint.Configure(
+            new Vector3(
+                plan.CheckpointX,
+                checkpointGround + 0.58f,
+                0f
+            )
+        );
+
+        EditorUtility.SetDirty(checkpointObject);
+        EditorUtility.SetDirty(checkpointCollider);
+        EditorUtility.SetDirty(levelCheckpoint);
     }
 
     private static LevelPlan CreatePlan(int levelNumber)
@@ -1427,7 +3285,174 @@ public static class MidtermSevenLevelBuilder
                 throw new ArgumentOutOfRangeException("levelNumber");
         }
 
+        ApplyTraversalComfortAdjustments(plan);
+
         return plan;
+    }
+
+    private static void ApplyTraversalComfortAdjustments(LevelPlan plan)
+    {
+        // These generated foreground decorations frequently appeared to
+        // float or overlap the playable route. Keep the scene objects
+        // disabled for easy rollback and omit them from future rebuilds.
+        plan.Decorations.Clear();
+
+        int primarySegmentCount = GetPrimarySegmentCount(plan);
+        Sprite groundSprite = LoadRawSprite(
+            "Grounds",
+            plan.GroundSprite
+        );
+        float naturalTileStep = Mathf.Min(
+            MaximumGapReduction,
+            groundSprite.bounds.size.x * 0.96f
+        );
+
+        for (int index = 0; index < primarySegmentCount - 1; index++)
+        {
+            Segment left = plan.Segments[index];
+            Segment right = plan.Segments[index + 1];
+            float gap = right.Start - left.End;
+
+            if (gap - naturalTileStep < MinimumJumpGap)
+            {
+                continue;
+            }
+
+            left.End += naturalTileStep;
+            plan.Segments[index] = left;
+        }
+
+        RaiseOverheadSegmentsForPoweredPlayer(plan, groundSprite);
+        RaiseBlockRowsForPoweredPlayer(plan);
+    }
+
+    private static void RaiseOverheadSegmentsForPoweredPlayer(
+        LevelPlan plan,
+        Sprite groundSprite
+    )
+    {
+        int primarySegmentCount = GetPrimarySegmentCount(plan);
+
+        for (
+            int index = primarySegmentCount;
+            index < plan.Segments.Count;
+            index++
+        )
+        {
+            Segment upper = plan.Segments[index];
+            float lowerTop = float.NegativeInfinity;
+
+            for (
+                int lowerIndex = 0;
+                lowerIndex < primarySegmentCount;
+                lowerIndex++
+            )
+            {
+                Segment lower = plan.Segments[lowerIndex];
+
+                if (
+                    lower.End <= upper.Start ||
+                    lower.Start >= upper.End ||
+                    lower.Top >= upper.Top
+                )
+                {
+                    continue;
+                }
+
+                lowerTop = Mathf.Max(lowerTop, lower.Top);
+            }
+
+            if (float.IsNegativeInfinity(lowerTop))
+            {
+                continue;
+            }
+
+            float minimumTop =
+                lowerTop +
+                groundSprite.bounds.size.y +
+                PoweredPassageClearance;
+
+            if (upper.Top < minimumTop)
+            {
+                upper.Top = minimumTop;
+                plan.Segments[index] = upper;
+            }
+        }
+    }
+
+    private static int GetPrimarySegmentCount(LevelPlan plan)
+    {
+        if (plan.Segments.Count == 0)
+        {
+            return 0;
+        }
+
+        int count = 1;
+
+        for (int index = 1; index < plan.Segments.Count; index++)
+        {
+            if (
+                plan.Segments[index].Start <=
+                plan.Segments[index - 1].Start
+            )
+            {
+                break;
+            }
+
+            count++;
+        }
+
+        return count;
+    }
+
+    private static void RaiseBlockRowsForPoweredPlayer(LevelPlan plan)
+    {
+        Sprite blockSprite = LoadRawSprite("Grounds", "Grounds_008");
+        float blockHalfWidth = blockSprite.bounds.extents.x * 0.72f;
+        float blockHalfHeight = blockSprite.bounds.extents.y * 0.72f;
+
+        for (int rowIndex = 0; rowIndex < plan.BlockRows.Count; rowIndex++)
+        {
+            Vector2 row = plan.BlockRows[rowIndex];
+            float highestGround = float.NegativeInfinity;
+
+            for (int blockIndex = 0; blockIndex < 5; blockIndex++)
+            {
+                float x = row.x + blockIndex * 0.72f;
+
+                foreach (Segment segment in plan.Segments)
+                {
+                    if (
+                        segment.End <= x - blockHalfWidth ||
+                        segment.Start >= x + blockHalfWidth
+                    )
+                    {
+                        continue;
+                    }
+
+                    highestGround = Mathf.Max(
+                        highestGround,
+                        segment.Top
+                    );
+                }
+            }
+
+            if (float.IsNegativeInfinity(highestGround))
+            {
+                continue;
+            }
+
+            float minimumCenterY =
+                highestGround +
+                PoweredPassageClearance +
+                blockHalfHeight;
+
+            if (row.y < minimumCenterY)
+            {
+                row.y = minimumCenterY;
+                plan.BlockRows[rowIndex] = row;
+            }
+        }
     }
 
     private static void ConfigureLevel1(LevelPlan plan)
@@ -1466,7 +3491,7 @@ public static class MidtermSevenLevelBuilder
             new EnemySpec("Bird", "Enemies_019", 61f, 0.5f, true),
             new EnemySpec("Spider", "Enemies_007", 91f, 0f)
         });
-        plan.SpikeXs.AddRange(new[] { 81f, 89f });
+        plan.SpikeXs.AddRange(new[] { 80.8f, 82f });
         plan.CoinRows.AddRange(new[]
         {
             new Vector2(-2f, -1.7f),
@@ -1481,12 +3506,6 @@ public static class MidtermSevenLevelBuilder
             new Vector2(56f, -0.35f),
             new Vector2(78f, -0.25f)
         });
-        plan.Decorations.AddRange(new[]
-        {
-            new Vector3(5f, -1.9f, 1f),
-            new Vector3(44f, -1.9f, 1f),
-            new Vector3(92f, -1.9f, 1f)
-        });
         plan.PipeXs.AddRange(new[] { 34f, 94f });
     }
 
@@ -1498,6 +3517,7 @@ public static class MidtermSevenLevelBuilder
         plan.PlatformAtlas = "Objects";
         plan.PlatformSprite = "Objects_037";
         plan.PlatformScale = 0.95f;
+        plan.PlatformWidthScale = 1.3f;
         plan.DecorationSprite = "Backgrounds_047";
         plan.HazardSprite = "Grounds_083";
         plan.CameraColor = new Color(0.06f, 0.17f, 0.2f, 1f);
@@ -1536,7 +3556,7 @@ public static class MidtermSevenLevelBuilder
             new EnemySpec("Bird", "Enemies_058", 70f, 0.8f, true),
             new EnemySpec("Hedgehog", "Enemies_025", 82f, 0f)
         });
-        plan.SpikeXs.AddRange(new[] { 55.5f, 58f, 79f, 96f });
+        plan.SpikeXs.AddRange(new[] { 56.2f, 57.4f });
         plan.CoinRows.AddRange(new[]
         {
             new Vector2(-1f, -1.6f),
@@ -1602,7 +3622,7 @@ public static class MidtermSevenLevelBuilder
             new EnemySpec("Bird", "Enemies_019", 67f, 1.0f, true),
             new EnemySpec("Bird", "Enemies_020", 92f, 0.4f, true)
         });
-        plan.SpikeXs.AddRange(new[] { 68f, 70f, 96f });
+        plan.SpikeXs.AddRange(new[] { 68.4f, 69.6f });
         plan.CoinRows.AddRange(new[]
         {
             new Vector2(-2f, -1.5f),
@@ -1664,7 +3684,6 @@ public static class MidtermSevenLevelBuilder
             new EnemySpec("Bird", "Enemies_019", 69f, 0.9f, true),
             new EnemySpec("Spider", "Enemies_007", 79.5f, 0f)
         });
-        plan.SpikeXs.AddRange(new[] { 62f, 64f, 86f, 94f });
         plan.CoinRows.AddRange(new[]
         {
             new Vector2(-2f, -1.5f),
@@ -1731,7 +3750,7 @@ public static class MidtermSevenLevelBuilder
             new EnemySpec("Bird", "Enemies_019", 75f, 0.8f, true),
             new EnemySpec("Spider", "Enemies_007", 89f, 0f)
         });
-        plan.SpikeXs.AddRange(new[] { 22f, 24f, 57f, 59f, 83f });
+        plan.SpikeXs.AddRange(new[] { 22f, 23.2f, 57f, 58.2f });
         plan.CoinRows.AddRange(new[]
         {
             new Vector2(-2f, -1.6f),
@@ -1800,7 +3819,7 @@ public static class MidtermSevenLevelBuilder
             new EnemySpec("Bird", "Enemies_058", 74f, 0.8f, true),
             new EnemySpec("Spider", "Enemies_056", 84.5f, 0f)
         });
-        plan.SpikeXs.AddRange(new[] { 17f, 43f, 45f, 69f, 71f, 97f });
+        plan.SpikeXs.AddRange(new[] { 21.5f, 22.7f, 46.5f, 47.7f });
         plan.CoinRows.AddRange(new[]
         {
             new Vector2(-2f, -1.5f),
@@ -1873,7 +3892,6 @@ public static class MidtermSevenLevelBuilder
             new EnemySpec("Hedgehog", "Enemies_025", 76f, 0f),
             new EnemySpec("Bird", "Enemies_020", 87.5f, 0.6f, true)
         });
-        plan.SpikeXs.AddRange(new[] { 38f, 40f, 63f, 65f });
         plan.CoinRows.AddRange(new[]
         {
             new Vector2(-2f, -1.5f),
@@ -1937,6 +3955,32 @@ public static class MidtermSevenLevelBuilder
         }
 
         return result;
+    }
+
+    private static bool TryFindGroundTop(
+        LevelPlan plan,
+        float x,
+        out float top
+    )
+    {
+        top = FloorY;
+        bool found = false;
+
+        foreach (Segment segment in plan.Segments)
+        {
+            if (x < segment.Start || x > segment.End)
+            {
+                continue;
+            }
+
+            if (!found || segment.Top > top)
+            {
+                top = segment.Top;
+                found = true;
+            }
+        }
+
+        return found;
     }
 
     private static string GetRawAtlasForSprite(string spriteName)
@@ -2003,6 +4047,18 @@ public static class MidtermSevenLevelBuilder
         }
 
         return null;
+    }
+
+    private static GameObject FindDescendant(
+        Transform parent,
+        string name
+    )
+    {
+        return parent
+            .GetComponentsInChildren<Transform>(true)
+            .Where(item => item != parent)
+            .Select(item => item.gameObject)
+            .FirstOrDefault(item => item.name == name);
     }
 
     private static void EnsureFolder(string assetFolder)

@@ -40,6 +40,13 @@ public class LevelGoal : MonoBehaviour
             return;
         }
 
+        BossEnemy boss = FindObjectOfType<BossEnemy>();
+
+        if (boss != null && !boss.IsDefeated)
+        {
+            return;
+        }
+
         completed = true;
 
         if (levelCompleteSound != null)
@@ -47,7 +54,13 @@ public class LevelGoal : MonoBehaviour
             audioSource.PlayOneShot(levelCompleteSound, 0.9f);
         }
 
-        PlayerHealth playerHealth = player.GetComponent<PlayerHealth>();
+        PlayerHealth playerHealth =
+            other.GetComponentInParent<PlayerHealth>();
+
+        if (playerHealth == null)
+        {
+            playerHealth = FindObjectOfType<PlayerHealth>();
+        }
 
         if (playerHealth != null)
         {

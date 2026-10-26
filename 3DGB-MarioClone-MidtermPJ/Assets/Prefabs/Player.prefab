@@ -26,7 +26,7 @@ Transform:
   m_GameObject: {fileID: 376622955127112955}
   serializedVersion: 2
   m_LocalRotation: {x: -0, y: -0, z: -0, w: 1}
-  m_LocalPosition: {x: 0, y: -0.58, z: 0}
+  m_LocalPosition: {x: 0, y: -0.51, z: 0}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children: []
@@ -93,6 +93,7 @@ GameObject:
   - component: {fileID: 3861180855463547019}
   - component: {fileID: 5086849733531147081}
   - component: {fileID: 1140000000000000002}
+  - component: {fileID: 1140000000000000003}
   - component: {fileID: 8503607670580056657}
   m_Layer: 0
   m_Name: Player
@@ -249,7 +250,7 @@ BoxCollider2D:
   m_IsTrigger: 0
   m_UsedByEffector: 0
   m_UsedByComposite: 0
-  m_Offset: {x: 0, y: 0}
+  m_Offset: {x: 0, y: 0.07}
   m_SpriteTilingProperty:
     border: {x: 0, y: 0, z: 0, w: 0}
     pivot: {x: 0.5, y: 0.5}
@@ -277,6 +278,8 @@ MonoBehaviour:
   speed: 5
   jumpForce: 14
   groundCheckRadius: 0.12
+  groundCheckWidth: 0.52
+  groundedGraceTime: 0.08
   jumpSound: {fileID: 8300000, guid: d556950da7dfc94429358a80bf2ffb2b, type: 3}
 --- !u!114 &5086849733531147081
 MonoBehaviour:
@@ -308,7 +311,21 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   fireBullet: {fileID: 231269478598551031, guid: 03cf6014c586107498ffe015c8acaa1d, type: 3}
   shootKey: 120
+  shotCooldown: 0.25
   shootSound: {fileID: 8300000, guid: b95942cee1f70b94e99096dea45bea13, type: 3}
+--- !u!114 &1140000000000000003
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 7537833531015447698}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 58dc4b76b254ffa48a747ee1f44aa4c5, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  poweredScaleMultiplier: 1.2
 --- !u!82 &8503607670580056657
 AudioSource:
   m_ObjectHideFlags: 0

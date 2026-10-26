@@ -9,14 +9,18 @@ public abstract class EnemyBase : MonoBehaviour
     [SerializeField] private bool canBeStomped = true;
     [SerializeField] private float bounceForce = 8f;
     [SerializeField, Min(1)] private int bulletHitsToDefeat = 1;
+    [SerializeField, Min(0)] private int scoreValue = 200;
 
     protected Rigidbody2D MyBody { get; private set; }
     protected SpriteRenderer EnemySprite { get; private set; }
     protected Animator EnemyAnimator { get; private set; }
     protected Collider2D EnemyCollider { get; private set; }
     protected bool IsDefeated { get; private set; }
+    public bool CanBeStomped => canBeStomped;
 
     private int bulletHitCount;
+
+    private const float StompHeightTolerance = 0.15f;
 
     protected virtual void Awake()
     {
@@ -41,17 +45,15 @@ public abstract class EnemyBase : MonoBehaviour
             return;
         }
 
-        Rigidbody2D playerBody = player.GetComponent<Rigidbody2D>();
-        Collider2D playerCollider = player.GetComponent<Collider2D>();
-
-        bool playerIsFalling =
-            playerBody != null && playerBody.velocity.y <= 0f;
+        Collider2D playerCollider = FindSolidPlayerCollider(player);
 
         bool playerIsAbove =
             playerCollider != null &&
-            playerCollider.bounds.min.y >= EnemyCollider.bounds.center.y;
+            playerCollider.bounds.center.y > EnemyCollider.bounds.center.y &&
+            playerCollider.bounds.min.y >=
+                EnemyCollider.bounds.center.y - StompHeightTolerance;
 
-        if (canBeStomped && playerIsFalling && playerIsAbove)
+        if (canBeStomped && playerIsAbove)
         {
             Defeat();
             player.Bounce(bounceForce);
@@ -64,6 +66,29 @@ public abstract class EnemyBase : MonoBehaviour
         {
             playerHealth.TakeDamage();
         }
+    }
+
+    public void ConfigureStomp(bool allowed)
+    {
+        canBeStomped = allowed;
+    }
+
+    private static Collider2D FindSolidPlayerCollider(
+        PlayerMovement player
+    )
+    {
+        Collider2D[] colliders =
+            player.GetComponentsInChildren<Collider2D>(true);
+
+        foreach (Collider2D collider in colliders)
+        {
+            if (collider.enabled && !collider.isTrigger)
+            {
+                return collider;
+            }
+        }
+
+        return null;
     }
 
     protected virtual void OnTriggerEnter2D(Collider2D other)
@@ -99,6 +124,14 @@ public abstract class EnemyBase : MonoBehaviour
         IsDefeated = true;
         MyBody.velocity = Vector2.zero;
         EnemyCollider.enabled = false;
+
+        GameHUD hud = FindObjectOfType<GameHUD>();
+
+        if (hud != null)
+        {
+            hud.AddScore(scoreValue);
+        }
+
         Destroy(gameObject, 0.05f);
     }
 }

@@ -31,9 +31,11 @@ checkpoint placement, key, locked door and level goal. Level 7 additionally
 contains the boss placement and explicit boss-arena boundary markers.
 
 The terrain, coin pickup, enemy movement, moving platform, fall respawn and goal
-objects reuse the existing project scripts. Fire Flower, checkpoint, key/door
-and boss objects are deliberately named placement objects; their assignment
-gameplay scripts are the next implementation stage.
+objects reuse the existing project scripts. Fire Flowers are functional
+collectibles: they enlarge the player by 20 percent, enable X-key fireball
+shooting, and absorb the next hit before a life is deducted. Checkpoint,
+key/door and boss objects remain deliberately named placement objects for the
+next implementation stage.
 
 Five preview renders covering the full route of every scene are stored in
 `Documentation/MidtermLevelPreviews`.

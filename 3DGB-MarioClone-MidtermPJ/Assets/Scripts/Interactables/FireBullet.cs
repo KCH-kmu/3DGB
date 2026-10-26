@@ -61,7 +61,10 @@ public class FireBullet : MonoBehaviour
         bool hitAdditionalEnemy =
             target.GetComponentInParent<EnemyBase>() != null;
 
-        if (!hitBeetle && !hitSnail && !hitAdditionalEnemy)
+        bool hitBoss =
+            target.GetComponentInParent<BossEnemy>() != null;
+
+        if (!hitBeetle && !hitSnail && !hitAdditionalEnemy && !hitBoss)
         {
             return;
         }

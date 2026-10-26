@@ -124,10 +124,10 @@ public bool TryHitFromBelow(PlayerMovement player)
 
         float downwardSpeed = Mathf.Max(
             2f,
-            Mathf.Abs(playerBody.velocity.y) * 0.3f
+            Mathf.Abs(playerBody.linearVelocity.y) * 0.3f
         );
-        playerBody.velocity = new Vector2(
-            playerBody.velocity.x,
+        playerBody.linearVelocity = new Vector2(
+            playerBody.linearVelocity.x,
             -downwardSpeed
         );
 

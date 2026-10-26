@@ -62,7 +62,7 @@ public class PlayerMovement : MonoBehaviour
         }
 
         // 상승 중에는 발밑 원이 아직 지면과 겹쳐 있어도 공중 상태로 유지한다.
-        if (myBody.velocity.y > 0.1f)
+        if (myBody.linearVelocity.y > 0.1f)
         {
             SetGrounded(false);
             return;
@@ -103,17 +103,17 @@ public class PlayerMovement : MonoBehaviour
 
         if (h > 0)
         {
-            myBody.velocity = new Vector2(speed, myBody.velocity.y);
+            myBody.linearVelocity = new Vector2(speed, myBody.linearVelocity.y);
             ChangeDirection(1);
         }
         else if (h < 0)
         {
-            myBody.velocity = new Vector2(-speed, myBody.velocity.y);
+            myBody.linearVelocity = new Vector2(-speed, myBody.linearVelocity.y);
             ChangeDirection(-1);
         }
         else
         {
-            myBody.velocity = new Vector2(0, myBody.velocity.y);
+            myBody.linearVelocity = new Vector2(0, myBody.linearVelocity.y);
         }
 
         anim.SetInteger("Speed", Mathf.Abs((int)h));
@@ -123,8 +123,8 @@ public class PlayerMovement : MonoBehaviour
     {
         if (Input.GetKeyDown(KeyCode.Space) && isGrounded)
         {
-            myBody.velocity =
-                new Vector2(myBody.velocity.x, jumpForce);
+            myBody.linearVelocity =
+                new Vector2(myBody.linearVelocity.x, jumpForce);
 
             if (jumpSound != null)
             {
@@ -169,8 +169,8 @@ public class PlayerMovement : MonoBehaviour
 
     public void Bounce(float bounceForce)
     {
-        myBody.velocity = new Vector2(
-            myBody.velocity.x,
+        myBody.linearVelocity = new Vector2(
+            myBody.linearVelocity.x,
             bounceForce
         );
 

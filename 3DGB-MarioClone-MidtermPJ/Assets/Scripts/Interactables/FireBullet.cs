@@ -30,11 +30,11 @@ public class FireBullet : MonoBehaviour
     {
         if (hasExploded)
         {
-            myBody.velocity = Vector2.zero;
+            myBody.linearVelocity = Vector2.zero;
             return;
         }
 
-        myBody.velocity = new Vector2(Speed, 0f);
+        myBody.linearVelocity = new Vector2(Speed, 0f);
     }
 
     private void OnTriggerEnter2D(Collider2D target)
@@ -75,7 +75,7 @@ public class FireBullet : MonoBehaviour
     private void Explode()
     {
         hasExploded = true;
-        myBody.velocity = Vector2.zero;
+        myBody.linearVelocity = Vector2.zero;
         animator.Play("FireBulletExplode");
         Destroy(gameObject, explosionDuration);
     }

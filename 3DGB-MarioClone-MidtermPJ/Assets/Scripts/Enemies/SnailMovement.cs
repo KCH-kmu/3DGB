@@ -25,17 +25,17 @@ public class SnailMovement : MonoBehaviour
         // 기절 상태에서는 수평 이동을 멈춤
         if (animator.GetBool("IsStunned"))
         {
-            myBody.velocity = new Vector2(
+            myBody.linearVelocity = new Vector2(
                 0f,
-                myBody.velocity.y
+                myBody.linearVelocity.y
             );
 
             return;
         }
 
-        myBody.velocity = new Vector2(
+        myBody.linearVelocity = new Vector2(
             moveDirection * moveSpeed,
-            myBody.velocity.y
+            myBody.linearVelocity.y
         );
     }
 
@@ -101,7 +101,7 @@ public class SnailMovement : MonoBehaviour
 
         // 플레이어가 아래로 내려오는 중인지 확인
         bool playerIsFalling =
-            playerBody.velocity.y <= 0f;
+            playerBody.linearVelocity.y <= 0f;
 
         if (playerIsAbove && playerIsFalling)
         {
@@ -130,9 +130,9 @@ public class SnailMovement : MonoBehaviour
     {
         animator.SetBool("IsStunned", true);
 
-        myBody.velocity = new Vector2(
+        myBody.linearVelocity = new Vector2(
             0f,
-            myBody.velocity.y
+            myBody.linearVelocity.y
         );
     }
 
@@ -152,9 +152,9 @@ public class SnailMovement : MonoBehaviour
         UpdateDirectionVisual();
 
         // 충돌한 순간 곧바로 새로운 방향 적용
-        myBody.velocity = new Vector2(
+        myBody.linearVelocity = new Vector2(
             moveDirection * moveSpeed,
-            myBody.velocity.y
+            myBody.linearVelocity.y
         );
     }
 

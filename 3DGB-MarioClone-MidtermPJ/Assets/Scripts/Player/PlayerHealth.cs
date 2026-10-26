@@ -195,7 +195,7 @@ public class PlayerHealth : MonoBehaviour
 
         if (myBody != null)
         {
-            myBody.velocity = Vector2.zero;
+            myBody.linearVelocity = Vector2.zero;
             myBody.angularVelocity = 0f;
             myBody.position = startPosition;
             Physics2D.SyncTransforms();
@@ -363,7 +363,7 @@ private IEnumerator DamageCooldown()
 
         if (myBody != null)
         {
-            myBody.velocity = Vector2.zero;
+            myBody.linearVelocity = Vector2.zero;
             myBody.angularVelocity = 0f;
             myBody.simulated = false;
         }

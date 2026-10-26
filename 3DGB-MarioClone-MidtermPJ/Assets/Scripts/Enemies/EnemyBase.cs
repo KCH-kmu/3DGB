@@ -140,7 +140,7 @@ protected virtual void Awake()
         }
 
         IsDefeated = true;
-        MyBody.velocity = Vector2.zero;
+        MyBody.linearVelocity = Vector2.zero;
         EnemyCollider.enabled = false;
 
         GameHUD hud = FindObjectOfType<GameHUD>();

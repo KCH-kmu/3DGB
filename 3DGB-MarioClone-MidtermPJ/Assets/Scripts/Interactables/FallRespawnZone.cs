@@ -37,7 +37,7 @@ public class FallRespawnZone : MonoBehaviour
 
         if (playerBody != null)
         {
-            playerBody.velocity = Vector2.zero;
+            playerBody.linearVelocity = Vector2.zero;
             playerBody.angularVelocity = 0f;
             playerBody.position = respawnPosition;
             Physics2D.SyncTransforms();

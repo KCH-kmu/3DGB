@@ -42,11 +42,11 @@ public class FrogEnemy : EnemyBase
             TurnAround();
         }
 
-        bool isNearlyGrounded = Mathf.Abs(MyBody.velocity.y) < 0.05f;
+        bool isNearlyGrounded = Mathf.Abs(MyBody.linearVelocity.y) < 0.05f;
 
         if (isNearlyGrounded && Time.time >= nextJumpTime)
         {
-            MyBody.velocity = new Vector2(
+            MyBody.linearVelocity = new Vector2(
                 moveDirection * horizontalSpeed,
                 jumpForce
             );

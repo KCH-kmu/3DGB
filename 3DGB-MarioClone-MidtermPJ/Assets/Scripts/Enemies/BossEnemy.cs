@@ -94,7 +94,7 @@ private void FixedUpdate()
                 break;
 
             case BossState.Windup:
-                myBody.velocity = new Vector2(0f, myBody.velocity.y);
+                myBody.linearVelocity = new Vector2(0f, myBody.linearVelocity.y);
 
                 if (player != null)
                 {
@@ -114,7 +114,7 @@ private void FixedUpdate()
                 break;
 
             case BossState.Recovery:
-                myBody.velocity = new Vector2(0f, myBody.velocity.y);
+                myBody.linearVelocity = new Vector2(0f, myBody.linearVelocity.y);
 
                 if (stateTimer <= 0f)
                 {
@@ -151,9 +151,9 @@ private void FixedUpdate()
             moveDirection = -1;
         }
 
-        myBody.velocity = new Vector2(
+        myBody.linearVelocity = new Vector2(
             moveDirection * patrolSpeed,
-            myBody.velocity.y
+            myBody.linearVelocity.y
         );
         FaceDirection(moveDirection);
 
@@ -171,7 +171,7 @@ private void FixedUpdate()
 
             state = BossState.Windup;
             stateTimer = windupDuration;
-            myBody.velocity = new Vector2(0f, myBody.velocity.y);
+            myBody.linearVelocity = new Vector2(0f, myBody.linearVelocity.y);
             FaceDirection(player.position.x >= transform.position.x ? 1 : -1);
         }
     }
@@ -208,9 +208,9 @@ private void UpdateCharge()
             return;
         }
 
-        myBody.velocity = new Vector2(
+        myBody.linearVelocity = new Vector2(
             moveDirection * chargeSpeed,
-            myBody.velocity.y
+            myBody.linearVelocity.y
         );
         FaceDirection(moveDirection);
 
@@ -224,7 +224,7 @@ private void UpdateCharge()
     {
         state = BossState.Recovery;
         stateTimer = recoveryDuration;
-        myBody.velocity = new Vector2(0f, myBody.velocity.y);
+        myBody.linearVelocity = new Vector2(0f, myBody.linearVelocity.y);
     }
 
     private void FaceDirection(int direction)
@@ -261,7 +261,7 @@ private void HandlePlayerCollision(Collision2D collision)
         Collider2D playerCollider = FindSolidPlayerCollider(playerMovement);
         Rigidbody2D playerBody = playerMovement.GetComponent<Rigidbody2D>();
         bool movingDownward =
-            playerBody == null || playerBody.velocity.y <= 0.1f;
+            playerBody == null || playerBody.linearVelocity.y <= 0.1f;
         bool playerIsOnTop =
             playerCollider != null &&
             playerCollider.bounds.center.y > bossCollider.bounds.center.y &&
@@ -378,7 +378,7 @@ private void Defeat()
 
         state = BossState.Defeated;
         RestoreIgnoredPlayerCollision();
-        myBody.velocity = Vector2.zero;
+        myBody.linearVelocity = Vector2.zero;
         myBody.simulated = false;
         bossCollider.enabled = false;
 

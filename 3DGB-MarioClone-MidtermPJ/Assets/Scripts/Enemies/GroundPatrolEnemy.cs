@@ -52,9 +52,9 @@ protected override void Awake()
             TurnAround();
         }
 
-        MyBody.velocity = new Vector2(
+        MyBody.linearVelocity = new Vector2(
             moveDirection * moveSpeed,
-            MyBody.velocity.y
+            MyBody.linearVelocity.y
         );
     }
 

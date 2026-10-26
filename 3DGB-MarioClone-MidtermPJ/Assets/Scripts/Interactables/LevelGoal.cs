@@ -72,7 +72,7 @@ public class LevelGoal : MonoBehaviour
 
             if (playerBody != null)
             {
-                playerBody.velocity = Vector2.zero;
+                playerBody.linearVelocity = Vector2.zero;
                 playerBody.simulated = false;
             }
 

@@ -3253,7 +3253,7 @@ private static TMP_Text GetOrCreateHudText(
         text.fontStyle = FontStyles.Bold;
         text.color = Color.white;
         text.raycastTarget = false;
-        text.enableWordWrapping = false;
+        text.textWrappingMode = TextWrappingModes.NoWrap;
         text.overflowMode = TextOverflowModes.Overflow;
         text.outlineColor = new Color32(0, 0, 0, 230);
         text.outlineWidth = 0.2f;

@@ -35,13 +35,13 @@ public class BeetleMovement : MonoBehaviour
     {
         if (isFrozen || animator.GetBool("IsFrozen"))
         {
-            myBody.velocity = new Vector2(0f, myBody.velocity.y);
+            myBody.linearVelocity = new Vector2(0f, myBody.linearVelocity.y);
             return;
         }
 
-        myBody.velocity = new Vector2(
+        myBody.linearVelocity = new Vector2(
             moveDirection * moveSpeed,
-            myBody.velocity.y
+            myBody.linearVelocity.y
         );
     }
 
@@ -100,7 +100,7 @@ public class BeetleMovement : MonoBehaviour
         }
 
         // 걷는 중의 Y 속도 0을 낙하로 판단하지 않는다.
-        bool playerIsFalling = playerBody.velocity.y < -0.1f;
+        bool playerIsFalling = playerBody.linearVelocity.y < -0.1f;
 
         // 빠르게 낙하해 Trigger 중심을 조금 지난 경우도 머리 밟기로 인정한다.
         bool playerFeetAreAboveHead =
@@ -142,7 +142,7 @@ public class BeetleMovement : MonoBehaviour
 
         isFrozen = true;
         animator.SetBool("IsFrozen", true);
-        myBody.velocity = new Vector2(0f, myBody.velocity.y);
+        myBody.linearVelocity = new Vector2(0f, myBody.linearVelocity.y);
 
         StartCoroutine(DisappearAfterDelay());
     }
@@ -159,9 +159,9 @@ public class BeetleMovement : MonoBehaviour
             playerTransform.position.x < transform.position.x ? 1 : -1;
 
         UpdateDirectionVisual();
-        myBody.velocity = new Vector2(
+        myBody.linearVelocity = new Vector2(
             moveDirection * moveSpeed,
-            myBody.velocity.y
+            myBody.linearVelocity.y
         );
     }
 
